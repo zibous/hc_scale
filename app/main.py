@@ -20,10 +20,10 @@ from app.api.routes.appstatus import init_appstatus
 from app.api.routes.appstatus import router as appstatus_router
 from app.api.routes.dashboard import init_dashboard
 from app.api.routes.dashboard import router as dashboard_router
-from app.api.routes.health import router as health_router
 from app.api.routes.miscale import init_services
 from app.api.routes.miscale import router as miscale_router
-
+from app.api.routes.health import router as health_router
+from app.api.routes.kpi import router as kpi_router
 
 from app.core.config import cfg
 from app.core.heartbeat import Heartbeat
@@ -39,12 +39,15 @@ from app.services.ha_discovery import publish_discovery_all
 
 log = setup_logger("main")
 
+# --------------------------
 # Services
+# --------------------------
 user_service = UserService()
 db = DBManager()
 mqtt_client = MqttClient()
 shutdown_mgr = ShutdownManager(log)
 
+# notify
 def _notify_ha(event: str, **kwargs):
     """Webhook-Benachrichtigung (optional, crasht nicht bei Fehler)."""
     try:
@@ -77,7 +80,6 @@ class _HealthFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
 logging.getLogger("uvicorn.error").addFilter(_HealthFilter())
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -133,14 +135,11 @@ async def lifespan(app: FastAPI):
     log.info("%s shutting down", cfg.app_name)
     shutdown_mgr.initiate()
 
-
 app = FastAPI(
     title=cfg.app_name,
     version=cfg.app_version,
-    root_path=os.environ.get("ROOT_PATH", ""),
     lifespan=lifespan,
 )
-
 
 # Middleware für No-Cache Heade !
 # Wird benötigt, damit die Frontend-Assets (HTML/JS/CSS) nicht gecached werden und
@@ -152,47 +151,34 @@ setup_middleware(app)
 # --------------------------------
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-# 1. Absoluten Pfad im Docker-Container erzwingen
-# Ihr Docker-Volume spiegelt nach /app/frontend, also liegen die statischen Dateien in /app/frontend/static
 FRONTEND_STATIC = Path("/app/frontend/static")
-
-# Falls das Verzeichnis (z. B. bei lokaler Entwicklung ohne Docker) nicht existiert: Fallback
 if not FRONTEND_STATIC.exists():
     FRONTEND_STATIC = Path(__file__).resolve().parent.parent / "frontend" / "static"
-
-# Loggen Sie den Pfad beim Serverstart, damit wir im Log sehen, wo FastAPI sucht
-log.info("Statische Dateien werden geladen aus: %s", FRONTEND_STATIC.absolute())
-
-# 2. Statische Dateien mounten
 app.mount("/static", StaticFiles(directory=str(FRONTEND_STATIC)), name="static")
-
+templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "frontend"))
 
 # Routes
 app.include_router(health_router, prefix="/api", tags=["health"])
 app.include_router(appstatus_router, prefix="/api", tags=["status"])
 app.include_router(miscale_router, prefix="", tags=["miscale"])
 app.include_router(dashboard_router, prefix="", tags=["dashboard"])
-
+app.include_router(kpi_router, prefix="/api", tags=["kpi"])
+app.include_router(health_router, prefix="/api")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Dashboard HTML."""
-    from pathlib import Path
-    from fastapi.templating import Jinja2Templates
-    templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "frontend"))
-    base_url = str(request.scope.get("root_path", ""))
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "app_title": cfg.app_title,
-            "base_url": base_url,
+            "base_url": "",
         },
     )
 
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("app.main:app", host=cfg.host, port=cfg.port, reload=True)

@@ -18,7 +18,6 @@ function setDateRange(days) {
   const to = new Date();
   const from = new Date();
   from.setDate(to.getDate() - days);
-
   $('#dTo').value = to.toISOString().split('T')[0];
   $('#dFrom').value = from.toISOString().split('T')[0];
   loadDashboard();
@@ -45,12 +44,16 @@ async function loadDashboard() {
   const data = await fetchDashboardData(userId, fromDate, toDate);
 
   if (data) {
-    state.lastData = data.current || [];
+    state.lastData = data.data || data.current || [];
     state.lastPrev = data.previous || [];
-    state.curSex = data.user?.sex || 'male';
+    state.curSex = data.user?.sex || (typeof data.user === 'string' ? 'male' : 'male');
     state.curTarget = data.user?.target || 70;
 
-    renderInfoBar(data.user);
+    // User-Info aus der Users-Liste holen
+    const users = Array.from(document.querySelectorAll('#uSel option'));
+    const selectedUser = $('#uSel').value;
+    const userInfo = state.usersCache?.find(u => u.name.toLowerCase() === selectedUser.toLowerCase());
+    renderInfoBar(userInfo || { name: selectedUser });
     renderCards(state.lastData);
     renderAllCharts(state.lastData, state.lastPrev);
 
@@ -68,11 +71,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 1. Benutzer laden
   const users = await fetchUsers();
+  state.usersCache = users;
   const uSel = $('#uSel');
 
   if (uSel && users && users.length > 0) {
     // Dropdown befüllen
-    uSel.innerHTML = users.map(u => `<option value="${u.id || u.name}">${u.name}</option>`).join('');
+    uSel.innerHTML = users.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
     uSel.addEventListener('change', loadDashboard);
 
     // 2. Erst wenn Benutzer da sind, den Datumsbereich und das Dashboard triggern
@@ -107,7 +111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function fetchUsers() {
   try {
-    const response = await fetch('/api/appstatus');
+    const response = await fetch('dashboard/api/users');
     if (!response.ok) throw new Error(`HTTP Fehler! Status: ${response.status}`);
 
     const data = await response.json();
@@ -128,7 +132,7 @@ async function fetchUsers() {
  */
 async function fetchDashboardData(userId, fromDate, toDate) {
   try {
-    let url = `/api/dashboard?user_id=${userId}`;
+    let url = `dashboard/api/data?user_id=${userId}`;
     if (fromDate) url += `&from=${fromDate}`;
     if (toDate) url += `&to=${toDate}`;
 

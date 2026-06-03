@@ -1,4 +1,4 @@
-import { $, state } from './constants.js';
+import { $, state, getRatingClass } from './constants.js';
 // Importiere die schlanken Konfigurationen
 import * as configs from './chart-configs.js';
 
@@ -23,9 +23,14 @@ export function renderInfoBar(user) {
   const avatarEl = $('#avatar');
   const infoTextEl = $('#infoText');
 
-  if (avatarEl) avatarEl.src = user.avatar || 'https://placeholder.com';
+  if (avatarEl) {
+    const name = (user.name || '').toLowerCase();
+    avatarEl.src = `dashboard/avatar/${name}`;
+    avatarEl.onerror = function() { this.style.display = 'none'; };
+  }
   if (infoTextEl) {
-    infoTextEl.innerHTML = `<strong>${user.name}</strong> &bull; Ziel: ${user.target || state.curTarget}kg &bull; ${user.sex === 'female' ? 'Weiblich' : 'Männlich'}`;
+    const target = user.target_weight || user.target || state.curTarget;
+    infoTextEl.innerHTML = `<strong>${user.name || ''}</strong> &bull; Ziel: ${target}kg &bull; ${user.sex === 'female' ? 'Weiblich' : 'Männlich'}`;
   }
 }
 
@@ -34,23 +39,40 @@ export function renderInfoBar(user) {
  */
 export function renderCards(data) {
   const container = $('#cards');
-  if (!container || !data) return;
+  if (!container || !data || data.length === 0) return;
 
   const latest = data[data.length - 1];
   if (!latest) return;
 
-  container.innerHTML = `
-    <div class="card good">
-      <div class="lb">Gewicht</div>
-      <div class="vl">${latest.weight?.toFixed(1) || '--'}</div>
-      <div class="un">kg</div>
-    </div>
-    <div class="card ok">
-      <div class="lb">Körperfett</div>
-      <div class="vl">${latest.fat?.toFixed(1) || '--'}</div>
-      <div class="un">%</div>
-    </div>
-  `;
+  // Vorheriger Wert für Delta-Berechnung
+  const prev = data.length > 1 ? data[data.length - 2] : null;
+
+  const cardDef = [
+    { label: 'Gewicht', value: latest.weight, prev: prev?.weight, unit: 'kg', type: 'bmi' },
+    { label: 'Körperfett', value: latest.fat, prev: prev?.fat, unit: '%', type: 'fat' },
+    { label: 'Muskel', value: latest.muscle, prev: prev?.muscle, unit: 'kg', type: 'muscle' },
+    { label: 'Wasser', value: latest.water, prev: prev?.water, unit: '%', type: 'water' },
+    { label: 'BMI', value: latest.bmi, prev: prev?.bmi, unit: '', type: 'bmi' },
+    { label: 'Viszeral', value: latest.visceral, prev: prev?.visceral, unit: '', type: 'visceral' },
+    { label: 'Protein', value: latest.protein, prev: prev?.protein, unit: '%', type: 'protein' },
+    { label: 'LBM', value: latest.lbm, prev: prev?.lbm, unit: 'kg', type: 'lbm' },
+    { label: 'POI', value: latest.poi, prev: prev?.poi, unit: '', type: 'poi' },
+  ];
+
+  container.innerHTML = cardDef.map(c => {
+    const val = c.value != null ? c.value.toFixed(1) : '--';
+    const cls = getRatingClass(c.type, c.value);
+    let deltaHtml = '';
+    if (c.prev != null && c.value != null) {
+      const delta = c.value - c.prev;
+      if (Math.abs(delta) >= 0.05) {
+        const sign = delta > 0 ? '▲' : '▼';
+        const dCls = delta > 0 ? 'up' : 'dn';
+        deltaHtml = `<div class="dl ${dCls}">${sign} ${Math.abs(delta).toFixed(1)}</div>`;
+      }
+    }
+    return `<div class="card ${cls}"><div class="lb">${c.label}</div><div class="vl">${val}</div><div class="un">${c.unit}</div>${deltaHtml}</div>`;
+  }).join('');
 }
 
 /**

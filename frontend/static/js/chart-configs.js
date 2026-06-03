@@ -1,28 +1,58 @@
 import { gc, tc } from './constants.js';
 
 // c1: Gewicht (mit Trend) & Fettfreie Masse
-export const getWeightConfig = (data) => ({
-  type: 'line',
-  data: {
-    labels: data.map(d => d.date),
-    datasets: [{
-      label: 'Gewicht (kg)',
-      data: data.map(d => d.weight),
-      borderColor: '#4361ee',
-      backgroundColor: 'rgba(66, 97, 238, 0.05)',
-      tension: 0.2,
-      fill: true
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: { type: 'time', grid: { color: gc() } },
-      y: { grid: { color: gc() } }
-    }
+export const getWeightConfig = (data) => {
+  // Trendlinie berechnen (lineare Regression)
+  const weights = data.map(d => d.weight);
+  const n = weights.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i; sumY += weights[i]; sumXY += i * weights[i]; sumX2 += i * i;
   }
-});
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  const trendData = weights.map((_, i) => +(intercept + slope * i).toFixed(2));
+
+  return {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [
+        {
+          label: 'Gewicht (kg)',
+          data: weights,
+          borderColor: '#4361ee',
+          backgroundColor: 'rgba(66, 97, 238, 0.05)',
+          tension: 0.2,
+          fill: true
+        },
+        {
+          label: 'Trend',
+          data: trendData,
+          borderColor: '#e63946',
+          borderDash: [6, 3],
+          pointRadius: 0,
+          tension: 0
+        },
+        {
+          label: 'Fettfreie Masse',
+          data: data.map(d => d.lbm),
+          borderColor: '#2ec4b6',
+          tension: 0.2,
+          borderWidth: 1.5
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: 'time', grid: { color: gc() } },
+        y: { grid: { color: gc() } }
+      }
+    }
+  };
+};
 
 // c2: Zusammenfassung (Gewicht / Muskeln / BMI)
 export const getSummaryConfig = (data) => ({
@@ -113,27 +143,37 @@ export const getNormalizedConfig = (data) => {
   };
 };
 
-// c6: Makronährstoffe (kcal/Tag)
-export const getNutritionConfig = (data) => ({
-  type: 'bar',
-  data: {
-    labels: data.map(d => d.date),
-    datasets: [{
-      label: 'Energieaufnahme (kcal)',
-      data: data.map(d => d.kcal),
-      backgroundColor: '#f4a261',
-      borderRadius: 4
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: { type: 'time', grid: { color: gc() } },
-      y: { grid: { color: gc() } }
+// c6: Makronährstoffe (kcal/Tag) – berechnet aus Gewicht/Größe/Alter
+export const getNutritionConfig = (data) => {
+  // BMR schätzen (Mifflin-St Jeor, männlich als Default)
+  const bmrData = data.map(d => {
+    // Vereinfachte BMR-Schätzung: 10 * weight + 625 - 5 * 70 (Alter ~70)
+    return d.weight ? Math.round(10 * d.weight + 625 - 350) : null;
+  });
+
+  return {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [{
+        label: 'Geschätzter Grundumsatz (kcal)',
+        data: bmrData,
+        borderColor: '#f4a261',
+        backgroundColor: 'rgba(244, 162, 97, 0.1)',
+        fill: true,
+        tension: 0.2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: 'time', grid: { color: gc() } },
+        y: { grid: { color: gc() }, title: { display: true, text: 'kcal', color: tc() } }
+      }
     }
-  }
-});
+  };
+};
 
 // c7: Veränderung (Differenz zur historischen Vorperiode)
 export const getDeltaConfig = (data, prevData) => {

@@ -3,6 +3,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 .PHONY: build up down restart rebuild logs ps run dev install clean backup help
+VERSION := $(shell git describe --tags --always)
 
 # ---------------------------------------------------------
 # Python interpreter (venv preferred, fallback python3)
@@ -30,6 +31,7 @@ dev1: ## Startet lokal mit auto-reload
 # ---------------------------------------------------------
 build: ## Build Docker image
 	@echo "Baue Docker image"
+	# docker build -t hc_scale:$(VERSION) -t hc_scale:latest .
 	docker compose build
 
 up: ## Start containers ohne neubauen des images
@@ -69,13 +71,12 @@ shell: ## Shell into container
 health: ## Check health endpoint
 	@curl -sf http://localhost:5045/api/satus | python3 -m json.tool || echo "UNHEALTHY"
 
-SHELL := /bin/bash
-
 compare:
-	@bash -c 'diff -u \
-		<(cd ./app && find . -not -path "*/.*" -not -path "*node_modules*" -not -path "*__pycache__*" | sort) \
-		<(docker exec hc_scale find /app/app -not -path "*/.*" -not -path "*node_modules*" -not -path "*__pycache__*" | sed "s|/app/app|.|" | sort) \
-		| grep -E "^[+-][^+-]"'
+	@mkdir -p /tmp/hc_scale_files
+	@docker cp hc_scale:/app/. /tmp/hc_scale_files/
+	@rsync -unrv --delete --exclude="__pycache__" --exclude="*.pyc" /tmp/hc_scale_files/ ./app/ | grep -E 'deleting|[^/]$$' || true
+	@rm -rf /tmp/hc_scale_files
+
 
 # ---------------------------------------------------------
 # Maintenance
@@ -83,10 +84,11 @@ compare:
 install: ## Install dependencies
 	@pip install -r requirements.txt
 
-clean: ## Remove cache files
-	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-	@find . -name "*.pyc" -delete 2>/dev/null || true
+compare: ## make --silent compare 2>/dev/null
+	@mkdir -p /tmp/hc_scale_files
+	@docker cp hc_scale:/app/. /tmp/hc_scale_files/
+	@diff -qr --exclude="__pycache__" --exclude="*.pyc" --exclude="data" ./ /tmp/hc_scale_files/ | grep -v "Nur in \./" || true
+	@rm -rf /tmp/hc_scale_files
 
 backup: ## Backup database
 	@cp data/miscaledata.db data/miscaledata.db.bak.$$(date +%Y%m%d) 2>/dev/null && \
