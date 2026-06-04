@@ -71,13 +71,6 @@ shell: ## Shell into container
 health: ## Check health endpoint
 	@curl -sf http://localhost:5045/api/satus | python3 -m json.tool || echo "UNHEALTHY"
 
-compare:
-	@mkdir -p /tmp/hc_scale_files
-	@docker cp hc_scale:/app/. /tmp/hc_scale_files/
-	@rsync -unrv --delete --exclude="__pycache__" --exclude="*.pyc" /tmp/hc_scale_files/ ./app/ | grep -E 'deleting|[^/]$$' || true
-	@rm -rf /tmp/hc_scale_files
-
-
 # ---------------------------------------------------------
 # Maintenance
 # ---------------------------------------------------------
@@ -109,6 +102,26 @@ git-update: ## Git Forgejo Update durchführen
 	git add -A
 	git commit -m "Update am $$(date +'%Y-%m-%d %H:%M')" || true
 	git push -u origin main
+
+.PHONY: build clean
+
+
+# 🔧 Komprimiert JS und CSS parallel über Docker – maximal optimiert
+jsbuild:
+	@echo "📦 Starte JS & CSS Bundling via Docker & esbuild..."
+	@docker run --rm -v "$$(pwd)":/app -w /app node:20-alpine sh -c "\
+		npx esbuild frontend/static/js/v3/app.js --bundle --minify --sourcemap --target=es2020 --outfile=frontend/static/js/v3/app.bundle.js && \
+		npx esbuild frontend/static/css/style2.css --minify --sourcemap --outfile=frontend/static/css/style2.bundle.css"
+	@echo "✅ Fertig! JS und CSS Bundles wurden erfolgreich im static-Ordner erstellt."
+
+jsclean:
+	@echo "🧼 Bereinige produktive Build-Dateien..."
+	@rm -f frontend/static/js/v3/app.bundle.js
+	@rm -f frontend/static/js/v3/app.bundle.js.map
+	@rm -f frontend/static/css/style.bundle.css
+	@rm -f frontend/static/css/style.bundle.css.map
+	@echo "✨ Verzeichnis ist wieder sauber."
+
 
 # ---------------------------------------------------------
 # Help

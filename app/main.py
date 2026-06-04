@@ -5,15 +5,18 @@ home-miscale – FastAPI Application
 ESP32 (ESPHome) → HTTP POST → FastAPI → Berechnung → SQLite + MQTT → Home Assistant
 """
 
+import os
 import atexit
 import json
 import logging
-import os
 import threading
+from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.api.middleware import setup_middleware
 from app.api.routes.appstatus import init_appstatus
@@ -141,23 +144,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Middleware für No-Cache Heade !
-# Wird benötigt, damit die Frontend-Assets (HTML/JS/CSS) nicht gecached werden und
-# immer die aktuelle Version laden. Besonders wichtig während der Entwicklung.
+# Middleware für No-Cache Header einrichten
 setup_middleware(app)
 
 # --------------------------------
-# Statische Dateien mounten
+# Statische Dateien & Templates mounten
 # --------------------------------
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-
 FRONTEND_STATIC = Path("/app/frontend/static")
 if not FRONTEND_STATIC.exists():
     FRONTEND_STATIC = Path(__file__).resolve().parent.parent / "frontend" / "static"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_STATIC)), name="static")
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "frontend"))
+
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+templates = Jinja2Templates(directory=str(FRONTEND_DIR))
 
 # Routes
 app.include_router(health_router, prefix="/api", tags=["health"])
@@ -165,12 +164,26 @@ app.include_router(appstatus_router, prefix="/api", tags=["status"])
 app.include_router(miscale_router, prefix="", tags=["miscale"])
 app.include_router(dashboard_router, prefix="", tags=["dashboard"])
 app.include_router(kpi_router, prefix="/api", tags=["kpi"])
-app.include_router(health_router, prefix="/api")
 
+# Gültige Templates einmalig beim Start ermitteln --------
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+ALLOWED_PAGES = {f.stem for f in FRONTEND_DIR.glob("*.html")}
+
+# ---------  Dashboard  ----------------
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+@app.get("/{name}", response_class=HTMLResponse)
+async def render_page(request: Request, name: str = None):
+
+    # Falls der Root-Pfad "/" aufgerufen wird, nutze standardmäßig index
+    target_name = name or "index"
+    # Entfernt eventuelle .html Endungen für maximale Flexibilität
+    clean_name = target_name.replace(".html", "")
+
+    if clean_name not in ALLOWED_PAGES:
+        raise HTTPException(status_code=404, detail="Page not found")
+
     return templates.TemplateResponse(
-        "index.html",
+        f"{clean_name}.html",
         {
             "request": request,
             "app_title": cfg.app_title,

@@ -149,6 +149,7 @@ async def miscale(request: Request):
         "timestamp": _normalize_ts(data.get("timestamp", "")),
         "timer": threading.Timer(DEBOUNCE_SECONDS, _process_measurement, args=[key]),
     }
+
     _pending[key]["timer"].daemon = True
     _pending[key]["timer"].start()
 

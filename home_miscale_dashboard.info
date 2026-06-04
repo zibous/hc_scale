@@ -1,0 +1,92 @@
+Modernes Dashboard folgenden Daten:
+
+ - Auswahl Benutzer
+ - KPI Daten mit aktuellen Werten (letzte Messung) und Trend
+   als Tiles
+ - Grafiken mit History Daten
+   -  Gewicht (mit Trend) & Fettfreie Masse
+   -  Zusammenfassung (Gewicht / Muskeln / BMI)
+   -  Körperfett & Viszeralfett (365 Tage)
+   -  Muskeln & Protein (365 Tage)
+   -  Radarchart: Körperwerte (normalisiert) (365 Tage)
+   -  Barchart: Makronährstoffe (kcal/Tag) (365 Tage)
+   -  Barchart Monatliche Veränderung (365 Tage)
+      - Fett, Muskeln, Wasser
+
+Datenbasis:
+{
+    "user": {
+        "name": "peter",
+        "sex": "male",
+        "target": 70,
+        "avatar": "/dashboard/avatar/peter"
+    },
+    "current": [
+        {
+            "id": 1,
+            "name": "Peter",
+            "timestamp": "2026-06-04T06:54:50",
+            "date": "2026-06-04",
+            "weight": 69.2,
+            "impedance": 528.0,
+            "fat": 12.94,
+            "visceral": 6.55,
+            "water": 55.71,
+            "muscle": 52.12,
+            "bmi": 22.6,
+            "protein": 20.5,
+            "lbm": 54.7,
+            "poi": 12.91
+        }
+    ],
+    "history": [
+        {
+            "id": 1,
+            "name": "Peter",
+            "timestamp": "2026-06-01T06:59:08",
+            "date": "2026-06-01",
+            "weight": 70.0,
+            "impedance": 570.0,
+            "fat": 13.83,
+            "visceral": 6.95,
+            "water": 55.08,
+            "muscle": 51.43,
+            "bmi": 22.86,
+            "protein": 20.25,
+            "lbm": 54.67,
+            "poi": 13.06
+        },
+        {
+            "id": 1,
+            "name": "Peter",
+            "timestamp": "2026-06-02T05:52:47",
+            "date": "2026-06-02",
+            "weight": 69.3,
+            "impedance": 572.0,
+            "fat": 13.27,
+            "visceral": 6.6,
+            "water": 55.36,
+            "muscle": 51.77,
+            "bmi": 22.63,
+            "protein": 20.36,
+            "lbm": 54.43,
+            "poi": 12.93
+        },
+        {
+            "id": 1,
+            "name": "Peter",
+            "timestamp": "2026-06-03T06:24:49",
+            "date": "2026-06-03",
+            "weight": 69.35,
+            "impedance": 556.0,
+            "fat": 13.22,
+            "visceral": 6.62,
+            "water": 55.45,
+            "muscle": 51.85,
+            "bmi": 22.64,
+            "protein": 20.4,
+            "lbm": 54.56,
+            "poi": 12.94
+        }
+    ]
+}

@@ -17,6 +17,57 @@ und publiziert via MQTT an Home Assistant.
 - HA Webhook Notifications
 - Dark/Light Theme mit Colorpicker
 
+
+```bash
+                                  +-----------------------+
+
+                                  |    ESP32 (ESPHome)    |
+                                  |   Xiaomi Mi Scale     |
+                                  +-----------+-----------+
+
+                                              |
+                                              | HTTP POST (Gewicht & Impedanz)
+                                              v
++-----------------------------------------------------------------------------------------+
+
+| FastAPI Application                                                                     |
+|                                                                                         |
+|  +-----------------------+      +-----------------------+      +---------------------+  |
+|  |  /api/miscale Route   |----> |  CalcData Service     |----> |  DBManager          |  |
+|  |  (Empfängt HTTP POST) |      |  (Körperfett-Scores)  |      |  (SQLite DB)        |  |
+|  +-----------------------+      +-----------------------+      +---------------------+  |
+|                                             |                                           |
+|                                             | JSON Payload                              |
+|                                             v                                           |
+|                                 +-----------------------+                               |
+|                                 |  MqttClient           |                               |
+|                                 |  (Publish mit Retain) |                               |
+|                                 +-----------+-----------+                               |
+|                                             |                                           |
++---------------------------------------------|-------------------------------------------+
+
+                                              |
+                                              | MQTT Protokoll
+                                              v
+                                  +-----------------------+
+
+                                  |      MQTT Broker      |
+                                  |      (Mosquitto)      |
+                                  +-----------+-----------+
+
+                                              |
+                      +-----------------------+-----------------------+
+                      | MQTT Discovery                                | JSON Data
+                      v                                               v
+          +-----------------------+                       +-----------------------+
+
+          |    Home Assistant     |                       |    Web Frontend       |
+          | (Sensoren & Webhook)  |                       |  (Dashboard /pageid)  |
+          +-----------------------+                       +-----------------------+
+
+```
+
+
 ## Quick Start
 
 ```bash
@@ -162,8 +213,3 @@ location /dashboardmiscale/ {
     proxy_set_header X-Forwarded-Prefix /dashboardmiscale;
 }
 ```
-
-## Migration von v1
-
-Migriert aus `apps_v1/hc_scale` (Flask → FastAPI). Keine Logik-Änderungen.
-Body Metrics Berechnung 1:1 übernommen.

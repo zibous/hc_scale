@@ -6,7 +6,6 @@ import logging
 import os
 import sqlite3
 from io import StringIO
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -27,16 +26,6 @@ def init_dashboard(db: DBManager):
     _db = db
 
 
-def _deduplicate_rows(rows):
-    """Hilfsfunktion zur Deduplizierung von Messwerten pro Kalendertag."""
-    seen = {}
-    for r in [dict(r) for r in rows]:
-        d = r["date"]
-        if d not in seen or r["timestamp"] > seen[d]["timestamp"]:
-            seen[d] = r
-    return sorted(seen.values(), key=lambda x: x["date"])
-
-
 @router.get("/dashboard/api/data")
 async def dashboard_data(
     user: str = "peter",
@@ -53,20 +42,14 @@ async def dashboard_data(
         conn = sqlite3.connect(_db.db_path)
         conn.row_factory = sqlite3.Row
 
-        # --- FALL A: Explizite historische Anfrage (Abwärtskompatibilität) ---
         if before:
             n = int(limit) if limit else 30
             rows = conn.execute(
                 "SELECT * FROM daily_miscale WHERE LOWER(name)=? AND date<? ORDER BY date DESC LIMIT ?",
                 (user, before, n),
             ).fetchall()
-            conn.close()
-            deduped = _deduplicate_rows(reversed(rows))
-            return {"user": user, "count": len(deduped), "data": deduped}
-
-        # --- FALL B: Kombinierte Abfrage für das Haupt-Dashboard ---
-        # 1. Aktuellen Zeitraum abfragen
-        if date_from and date_to:
+            rows = list(reversed(rows))
+        elif date_from and date_to:
             rows = conn.execute(
                 "SELECT * FROM daily_miscale WHERE LOWER(name)=? AND date>=? AND date<=? ORDER BY date",
                 (user, date_from, date_to),
@@ -83,42 +66,18 @@ async def dashboard_data(
             ).fetchall()
             rows = list(reversed(rows))
 
-        current_deduped = _deduplicate_rows(rows)
-
-        # 2. Historische Vergleichsdaten generieren (Falls date_from gesetzt ist)
-        previous_deduped = []
-        if date_from:
-            # Hole bis zu 60 Einträge, die VOR dem gewählten Startdatum liegen
-            prev_rows = conn.execute(
-                "SELECT * FROM daily_miscale WHERE LOWER(name)=? AND date<? ORDER BY date DESC LIMIT 60",
-                (user, date_from),
-            ).fetchall()
-            previous_deduped = _deduplicate_rows(reversed(prev_rows))
-
         conn.close()
 
-        # 3. Benutzer-Metadaten einspeisen (Sex, Target, Avatar)
-        user_meta = {"name": user, "sex": "male", "target": 70.0, "avatar": f"/dashboard/avatar/{user}"}
-        try:
-            us = UserService()
-            u_info = us.find_by_name(user)
-            if u_info:
-                user_meta["target"] = u_info.scores.get("WEIGHT", 70.0)
-                user_meta["sex"] = u_info.sex
-        except Exception:
-            pass
+        seen = {}
+        for r in [dict(r) for r in rows]:
+            d = r["date"]
+            if d not in seen or r["timestamp"] > seen[d]["timestamp"]:
+                seen[d] = r
+        deduped = sorted(seen.values(), key=lambda x: x["date"])
 
-        # Gebündelte 3-in-1 Antwort zurückgeben
-        return {
-            "user": user_meta,
-            "current": current_deduped,
-            "previous": previous_deduped,
-            "data": current_deduped,  # Abwärtskompatibilität für das Frontend
-            "count": len(current_deduped)
-        }
-
+        return {"user": user, "count": len(deduped), "data": deduped}
     except Exception:
-        log.exception("Fehler beim Laden der kombinierten Dashboard-Daten")
+        log.exception("Fehler beim Laden der Daten")
         return JSONResponse({"error": "DB error"}, status_code=500)
 
 
@@ -228,7 +187,7 @@ async def dashboard_avatar(name: str):
         path = os.path.join(_AVATAR_DIR, f"{name.lower()}.{ext}")
         if os.path.isfile(path):
             return FileResponse(path)
-
+    # Fallback: 1x1 transparent PNG
     import struct
     import zlib
 
