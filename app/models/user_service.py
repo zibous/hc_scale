@@ -2,17 +2,20 @@
 """Lädt User-Profile aus persons.yaml."""
 
 import logging
+from pathlib import Path
 
 import yaml
 
+from app.core.config import cfg
 from app.models.person import UserProfile
 
 log = logging.getLogger(__name__)
 
 
 class UserService:
-    def __init__(self, config_path: str = "config/persons.yaml"):
-        with open(config_path, "r") as f:
+    def __init__(self, config_path: str | None = None):
+        path = config_path or str(Path(cfg.config_dir) / "persons.yaml")
+        with open(path, "r") as f:
             data = yaml.safe_load(f)
 
         self.users: list[UserProfile] = []

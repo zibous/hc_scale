@@ -11,7 +11,7 @@ export function renderProfile(user, latest, timeline, allUsers = [], onUserChang
 
   // 1. Avatar setzen
   if (avatarEl) {
-    avatarEl.src = user.avatar || `/dashboard/avatar/${user.name.toLowerCase()}`;
+    avatarEl.src = user.avatar || `dashboard/avatar/${user.name.toLowerCase()}`;
   }
 
   // 2. Zeit und Datum formatieren
@@ -28,78 +28,103 @@ export function renderProfile(user, latest, timeline, allUsers = [], onUserChang
   const diffDays = Math.ceil(Math.abs(new Date() - lastMeasurementDate) / (1000 * 60 * 60 * 24));
   const isActive = diffDays <= 4;
 
-  // Gewichtsvariablen deklarieren (Wichtig gegen den ReferenceError!)
   const targetScores = user.scores || {};
   const targetWeight = user.target || targetScores.WEIGHT || 70;
   const currentWeight = latest.weight || 0;
   const weightDiff = currentWeight - targetWeight;
 
-  // 3. 🔧 KORREKTUR: Mathematisch präzise Apple-Style Ring-Berechnung
+  // 3. Mathematisch präzise Apple-Style Ring-Berechnung
   let progressPercent = 0;
   let ringColor = 'var(--apple-blue)';
   let centerText = 'Ziel';
 
-  // Sicheres Auslesen des historischen Startgewichts aus der Timeline
   const initialWeight = (timeline && timeline.length > 0) ? timeline[0].weight : currentWeight;
-
   const totalWay = initialWeight - targetWeight;
   const wayAchieved = initialWeight - currentWeight;
 
   if (Math.abs(weightDiff) <= 0.2) {
-    // Punktlandung auf dem Wunschgewicht (Wunschgewicht erreicht)
     progressPercent = 100;
     ringColor = 'var(--apple-green)';
     centerText = '<span style="font-size:16px;">✓</span>';
   } else if (weightDiff < 0) {
-    // ✔️ FIX: Du bist UNTER dem Wunschgewicht!
-    // Der Ring färbt sich jetzt stabil und fehlerfrei BLAU für Aufbau
     progressPercent = (currentWeight / targetWeight) * 100;
     ringColor = 'var(--apple-blue)';
     centerText = 'Ziel';
   } else if (totalWay > 0 && wayAchieved > 0) {
-    // Normaler Abnehm-Prozess (Aktuelles Gewicht ist noch höher als das Ziel)
     progressPercent = (wayAchieved / totalWay) * 100;
     ringColor = 'var(--apple-red)';
     centerText = 'Ziel';
   } else if (totalWay < 0 && wayAchieved < 0) {
-    // Normaler Muskelaufbau-Prozess (Aktuelles Gewicht steigt in Richtung Ziel)
     progressPercent = (Math.abs(wayAchieved) / Math.abs(totalWay)) * 100;
     ringColor = 'var(--apple-blue)';
     centerText = 'Ziel';
   } else {
-    // Fallback bei Stagnation oder falscher Richtung
     progressPercent = 25;
     ringColor = weightDiff > 0 ? 'var(--apple-red)' : 'var(--apple-blue)';
     centerText = 'Ziel';
   }
 
-  // Absicherung und Clipping für den SVG-Kreisumfang (Radius = 32 -> Umfang = ~201)
   progressPercent = Math.min(Math.max(Math.round(progressPercent), 15), 100);
   const ringCircumference = 2 * Math.PI * 32;
   const ringOffset = ringCircumference - (progressPercent / 100) * ringCircumference;
 
-  // 4. Score Badges generieren
-  function createScoreBadge(title, current, target, unit = '', isNegativeMetric = false) {
+  // 4. 🔧 SCORE BADGES: Mit unfehlbarer Tooltip-Absicherung gegen undefined-Ziele
+    // 4. 🔧 LOGIK-FIX: Biologisch und mathematisch korrekte Farb-Ampel für jedes Badge
+  function createScoreBadge(title, current, targetInput, unit = '', isNegativeMetric = false) {
     if (!current) return '';
-    const diff = current - target;
-    let icon = '●', bgClass = 'badge-success', diffText = 'Ok';
 
-    if (Math.abs(diff) <= 0.2) {
-      icon = '●'; bgClass = 'badge-success'; diffText = 'Optimal';
+    // Zwingt targetInput auf eine gültige Zahl, falls die DB undefined liefert
+    const target = typeof targetInput === 'number' && !isNaN(targetInput) ? targetInput : (current || 0);
+    const diff = current - target;
+
+    let icon = '●';
+    let bgClass = 'badge-success'; // Standard: Grün (Optimal)
+    let statusText = 'Optimal';
+
+    // Ein Toleranzbereich von 0.5 Einheiten gilt im Profil als biologisch perfekt eingependelt
+    if (Math.abs(diff) <= 0.5) {
+      icon = '●';
+      bgClass = 'badge-success';
+      statusText = 'Optimal';
     } else {
       if (diff > 0) {
-        icon = '▲'; diffText = `+${diff.toFixed(1)}${unit}`;
+        // --- POSITIVE ABWEICHUNG (+) ---
+        icon = '▲';
+        statusText = `+${diff.toFixed(1)} ${unit}`;
+
+        // Wenn eine Metrik negativ ist (z.B. Fett hoch), färbe sie ROT (danger).
+        // Wenn sie positiv ist (z.B. Muskeln hoch), färbe sie GRÜN (success).
         bgClass = isNegativeMetric ? 'badge-danger' : 'badge-success';
       } else {
-        icon = '▼'; diffText = `${diff.toFixed(1)}${unit}`;
+        // --- NEGATIVE ABWEICHUNG (-) ---
+        icon = '▼';
+        statusText = `${diff.toFixed(1)} ${unit}`;
+
+        // Wenn eine Metrik negativ ist (z.B. Fett runter), färbe sie GRÜN (success).
+        // Wenn sie positiv ist (z.B. Muskeln runter), färbe sie ROT (danger).
         bgClass = isNegativeMetric ? 'badge-success' : 'badge-danger';
       }
     }
+
+    // 🔧 GEWICHTS-SONDERREGELUNG: Mehr Gewicht = Rot/Orange, Weniger Gewicht = Blau/Grün
+    if (title === 'Gewicht') {
+      statusText = diff > 0 ? `+${diff.toFixed(1)} ${unit}` : `${diff.toFixed(1)} ${unit}`;
+      bgClass = diff > 0 ? 'badge-danger' : (weightDiff < 0 ? 'badge-info' : 'badge-success');
+      icon = diff > 0 ? '▲' : '▼';
+    }
+
+    // INFOTEXT FÜR DEN GRAPHISCHEN APPLE-TOOLTIP
+    const tooltipExplanation = `📊 METRIK: ${title.toUpperCase()}\n\n` +
+      `● Aktuell: ${current.toFixed(1)} ${unit}\n` +
+      `● Zielwert: ${target.toFixed(1)} ${unit}\n` +
+      `● Abweichung: ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} ${unit}\n\n` +
+      `Bewertung basiert auf deinem Profil-Sollwert.`;
+
     return `
-      <div class="score-badge ${bgClass}">
+      <div class="score-badge ${bgClass}" data-title="${tooltipExplanation}" style="cursor: help;">
         <span class="score-badge-title">${title}</span>
-        <span class="score-badge-value">${icon} ${current.toFixed(1)}</span>
-        <span class="score-badge-status">${diffText}</span>
+        <span class="score-badge-value">${icon} ${current.toFixed(1)}${unit}</span>
+        <span class="score-badge-status">${statusText}</span>
       </div>
     `;
   }

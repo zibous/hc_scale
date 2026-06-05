@@ -2,7 +2,7 @@
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
-.PHONY: build up down restart rebuild logs ps run dev install clean backup help
+.PHONY: build up down restart rebuild logs ps run dev install clean backup help jsbuild jsclean
 VERSION := $(shell git describe --tags --always)
 
 # ---------------------------------------------------------
@@ -77,22 +77,37 @@ health: ## Check health endpoint
 install: ## Install dependencies
 	@pip install -r requirements.txt
 
-compare: ## make --silent compare 2>/dev/null
+compare: ## Vergleicht lokale Dateien mit Container-Inhalt
 	@mkdir -p /tmp/hc_scale_files
 	@docker cp hc_scale:/app/. /tmp/hc_scale_files/
-	@diff -qr --exclude="__pycache__" --exclude="*.pyc" --exclude="data" ./ /tmp/hc_scale_files/ | grep -v "Nur in \./" || true
+	@echo "─── Geänderte Dateien ───"
+	@diff -qr --exclude="__pycache__" --exclude="*.pyc" --exclude=".git" \
+		--exclude="data" --exclude="logs" --exclude=".env" --exclude=".ruff_cache" \
+		./ /tmp/hc_scale_files/ 2>/dev/null | sort || true
+	@echo ""
+	@echo "─── Nur lokal (neu/nicht im Container) ───"
+	@diff -qr --exclude="__pycache__" --exclude="*.pyc" --exclude=".git" \
+		--exclude="data" --exclude="logs" --exclude=".env" --exclude=".ruff_cache" \
+		./ /tmp/hc_scale_files/ 2>/dev/null | grep "Nur in \./" | sort || true
+	@echo ""
+	@echo "─── Nur im Container (lokal gelöscht) ───"
+	@diff -qr --exclude="__pycache__" --exclude="*.pyc" --exclude=".git" \
+		--exclude="data" --exclude="logs" --exclude=".env" --exclude=".ruff_cache" \
+		./ /tmp/hc_scale_files/ 2>/dev/null | grep "Nur in /tmp/" | sort || true
+	@rm -rf /tmp/hc_scale_files
+
+diff-detail: ## Zeigt inhaltliche Unterschiede zum Container
+	@mkdir -p /tmp/hc_scale_files
+	@docker cp hc_scale:/app/. /tmp/hc_scale_files/
+	@diff -ur --exclude="__pycache__" --exclude="*.pyc" --exclude=".git" \
+		--exclude="data" --exclude="logs" --exclude=".env" --exclude=".ruff_cache" \
+		/tmp/hc_scale_files/ ./ 2>/dev/null || true
 	@rm -rf /tmp/hc_scale_files
 
 backup: ## Backup database
 	@cp data/miscaledata.db data/miscaledata.db.bak.$$(date +%Y%m%d) 2>/dev/null && \
 		echo "✅ Backup: data/miscaledata.db.bak.$$(date +%Y%m%d)" || \
 		echo "❌ Keine DB gefunden"
-
-data-add: ## Simuliert eine Messung: make data-add USER=Peter WEIGHT=69.5
-	@PYTHONPATH=$(CURDIR) $(PYTHON) scripts/simulate_post.py --user $(or $(USER),Peter) --weight $(or $(WEIGHT),69.5) --impedance $(or $(IMPEDANCE),580)
-
-data-remove: ## Entfernt letzten Eintrag: make data-remove USER=Peter
-	@PYTHONPATH=$(CURDIR) $(PYTHON) scripts/simulate_post.py --remove --user $(or $(USER),Peter)
 
 graph:
 	pyreverse app -o png
@@ -102,9 +117,6 @@ git-update: ## Git Forgejo Update durchführen
 	git add -A
 	git commit -m "Update am $$(date +'%Y-%m-%d %H:%M')" || true
 	git push -u origin main
-
-.PHONY: build clean
-
 
 # 🔧 Komprimiert JS und CSS parallel über Docker – maximal optimiert
 jsbuild:
@@ -121,6 +133,26 @@ jsclean:
 	@rm -f frontend/static/css/style.bundle.css
 	@rm -f frontend/static/css/style.bundle.css.map
 	@echo "✨ Verzeichnis ist wieder sauber."
+
+
+# ---------------------------------------------------------
+# Test API
+# ---------------------------------------------------------
+HOST := localhost
+PORT := 4056
+
+test-post: ## POST Testmessung (Reni) an /miscale
+	@curl -s -X POST http://$(HOST):$(PORT)/miscale \
+		-H "Content-Type: application/json" \
+		-d '{"name": "Reni", "weight": 49.5, "impedance": 630, "timestamp": "'$$(date +%Y-%m-%dT%H:%M:%S)'"}' | python3 -m json.tool
+
+test-post-peter: ## POST Testmessung (Peter) an /miscale
+	@curl -s -X POST http://$(HOST):$(PORT)/miscale \
+		-H "Content-Type: application/json" \
+		-d '{"name": "Peter", "weight": 74.2, "impedance": 510, "timestamp": "'$$(date +%Y-%m-%dT%H:%M:%S)'"}' | python3 -m json.tool
+
+test-health: ## GET Health-Check
+	@curl -s http://$(HOST):$(PORT)/api/health | python3 -m json.tool
 
 
 # ---------------------------------------------------------

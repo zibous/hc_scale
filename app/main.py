@@ -5,18 +5,13 @@ home-miscale – FastAPI Application
 ESP32 (ESPHome) → HTTP POST → FastAPI → Berechnung → SQLite + MQTT → Home Assistant
 """
 
-import os
 import atexit
-import json
 import logging
-import threading
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from app.api.middleware import setup_middleware
 from app.api.routes.appstatus import init_appstatus
@@ -27,37 +22,46 @@ from app.api.routes.miscale import init_services
 from app.api.routes.miscale import router as miscale_router
 from app.api.routes.health import router as health_router
 from app.api.routes.kpi import router as kpi_router
+from app.api.routes.pages import router as pages_router
 
 from app.core.config import cfg
 from app.core.heartbeat import Heartbeat
 from app.core.logging import setup_logger
 from app.core.mqtt import MqttClient
+from app.core.mqtt_startup import run_mqtt_startup
 from app.core.shutdown import ShutdownManager
-from app.core.webhook import notify_ha
 
 from app.models.user_service import UserService
-from app.services.calcdata import CalcData
 from app.services.db_manager import DBManager
-from app.services.ha_discovery import publish_discovery_all
 
 log = setup_logger("main")
 
-# --------------------------
-# Services
-# --------------------------
+
+# -----------------------------------------------------------------
+# Services (Singletons für die gesamte App-Lebensdauer)
+# -----------------------------------------------------------------
 user_service = UserService()
 db = DBManager()
 mqtt_client = MqttClient()
 shutdown_mgr = ShutdownManager(log)
 
-# notify
-def _notify_ha(event: str, **kwargs):
-    """Webhook-Benachrichtigung (optional, crasht nicht bei Fehler)."""
-    try:
-        notify_ha(event, **kwargs)
-    except Exception:
-        pass
 
+# -----------------------------------------------------------------
+# Uvicorn Log-Filter: Health-Checks nicht loggen
+# -----------------------------------------------------------------
+class _HealthFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return "/api/health" not in msg and "Invalid HTTP request" not in msg
+
+
+logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
+logging.getLogger("uvicorn.error").addFilter(_HealthFilter())
+
+
+# -----------------------------------------------------------------
+# Cleanup bei unerwartetem Beenden (atexit)
+# -----------------------------------------------------------------
 def _cleanup():
     if shutdown_mgr.is_set():
         return
@@ -69,21 +73,13 @@ def _cleanup():
         except Exception:
             pass
 
+
 atexit.register(_cleanup)
 
 
-# Health-Check Log Filter
-class _HealthFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        if "/api/health" in msg or "Invalid HTTP request" in msg:
-            return False
-        return True
-
-
-logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
-logging.getLogger("uvicorn.error").addFilter(_HealthFilter())
-
+# -----------------------------------------------------------------
+# Lifespan: Startup & Shutdown
+# -----------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup und Shutdown."""
@@ -94,42 +90,14 @@ async def lifespan(app: FastAPI):
     init_appstatus(mqtt_client)
     init_dashboard(db)
 
-    # Heartbeat starten
+    # MQTT: Heartbeat + HA Discovery
     if mqtt_client.ready:
         heartbeat = Heartbeat(mqtt_client, cfg.mqtt.heartbeat, log, shutdown_mgr, cfg.mqtt.keepalive)
         heartbeat.start()
         shutdown_mgr.register(heartbeat.stop)
         log.info("Heartbeat gestartet → %s", cfg.mqtt.heartbeat)
 
-        # HA Discovery + letzte Messwerte im Hintergrund
-        def _mqtt_startup():
-            try:
-                users = user_service.all_users()
-                publish_discovery_all(mqtt_client, [u.name for u in users])
-
-                for user in users:
-                    path = os.path.join(cfg.data_dir, f"miscale-{user.name}.json")
-                    if not os.path.isfile(path):
-                        continue
-                    with open(path, "r") as f:
-                        data = json.load(f)
-
-                    topic_data = f"{cfg.mqtt.topic}/{user.name}/data"
-                    mqtt_client.publish(topic_data, data, retain=True)
-
-                    try:
-                        calc = CalcData(user, data["weight"], data.get("impedance", 500), data.get("timestamp", ""))
-                        calc.calculate()
-                        scores = calc.calculate_scores()
-                        mqtt_client.publish(f"{cfg.mqtt.topic}/{user.name}/scores", scores, retain=True)
-                    except Exception:
-                        log.exception("Scores-Berechnung fehlgeschlagen für %s", user.name)
-
-                log.info("MQTT Startup abgeschlossen")
-            except Exception:
-                log.exception("MQTT Startup fehlgeschlagen")
-
-        threading.Thread(target=_mqtt_startup, daemon=True, name="mqtt-startup").start()
+        run_mqtt_startup(mqtt_client, user_service)
     else:
         log.warning("MQTT nicht verfügbar – Heartbeat und HA Discovery deaktiviert")
 
@@ -138,60 +106,38 @@ async def lifespan(app: FastAPI):
     log.info("%s shutting down", cfg.app_name)
     shutdown_mgr.initiate()
 
+
+# -----------------------------------------------------------------
+# FastAPI App
+# -----------------------------------------------------------------
 app = FastAPI(
     title=cfg.app_name,
     version=cfg.app_version,
     lifespan=lifespan,
 )
 
-# Middleware für No-Cache Header einrichten
+# CORS-Infrastruktur für API-Zugriffe erlauben
+# Performance-Optimierung: No-Cache über nativen FastAPI-Middleware-Hook
 setup_middleware(app)
 
-# --------------------------------
-# Statische Dateien & Templates mounten
-# --------------------------------
-FRONTEND_STATIC = Path("/app/frontend/static")
-if not FRONTEND_STATIC.exists():
-    FRONTEND_STATIC = Path(__file__).resolve().parent.parent / "frontend" / "static"
-app.mount("/static", StaticFiles(directory=str(FRONTEND_STATIC)), name="static")
+# Statische Dateien
+# Alle bei html ohne führenden slash / 
+FRONTEND_DIR = Path(cfg.config_dir).parent / "frontend"
+app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR / "static")), name="static")
 
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
-templates = Jinja2Templates(directory=str(FRONTEND_DIR))
-
-# Routes
+# API-Router
 app.include_router(health_router, prefix="/api", tags=["health"])
 app.include_router(appstatus_router, prefix="/api", tags=["status"])
 app.include_router(miscale_router, prefix="", tags=["miscale"])
 app.include_router(dashboard_router, prefix="", tags=["dashboard"])
 app.include_router(kpi_router, prefix="/api", tags=["kpi"])
 
-# Gültige Templates einmalig beim Start ermitteln --------
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
-ALLOWED_PAGES = {f.stem for f in FRONTEND_DIR.glob("*.html")}
-
-# ---------  Dashboard  ----------------
-@app.get("/", response_class=HTMLResponse)
-@app.get("/{name}", response_class=HTMLResponse)
-async def render_page(request: Request, name: str = None):
-
-    # Falls der Root-Pfad "/" aufgerufen wird, nutze standardmäßig index
-    target_name = name or "index"
-    # Entfernt eventuelle .html Endungen für maximale Flexibilität
-    clean_name = target_name.replace(".html", "")
-
-    if clean_name not in ALLOWED_PAGES:
-        raise HTTPException(status_code=404, detail="Page not found")
-
-    return templates.TemplateResponse(
-        f"{clean_name}.html",
-        {
-            "request": request,
-            "app_title": cfg.app_title,
-            "base_url": "",
-        },
-    )
+# HTML-Seiten (Catch-all, darum zuletzt)
+app.include_router(pages_router, tags=["pages"])
 
 
+# -----------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
+    ## IP UND PORT aus .env, wird aber über uvicorn command überschrieben
     uvicorn.run("app.main:app", host=cfg.host, port=cfg.port, reload=True)

@@ -24,6 +24,18 @@ def _env_int(key: str, default: int = 0) -> int:
     return int(os.getenv(key, str(default)))
 
 
+def _resolve_path(raw: str, default_relative: str) -> str:
+    """Löst einen Pfad aus .env auf.
+
+    - Absolute Pfade bleiben unverändert (z.B. /app/data in Docker).
+    - Relative Pfade werden relativ zu PROJECT_ROOT aufgelöst.
+    """
+    p = Path(raw) if raw else Path(default_relative)
+    if p.is_absolute():
+        return str(p)
+    return str((PROJECT_ROOT / p).resolve())
+
+
 @dataclass(frozen=True)
 class WebhookConfig:
     url: str = _env("HA_WEBHOOK_URL", "")
@@ -51,7 +63,7 @@ class MqttConfig:
 class LogConfig:
     level: str = _env("LOG_LEVEL", "INFO")
     mode: str = _env("LOG_MODE", "console")
-    file: str = _env("LOG_FILE", "logs/miscale.log")
+    file: str = _resolve_path(_env("LOG_FILE", ""), "logs/miscale.log")
     max_bytes: int = _env_int("LOG_MAX_BYTES", 1_000_000)
     backup_count: int = _env_int("LOG_BACKUP_COUNT", 3)
 
@@ -59,15 +71,15 @@ class LogConfig:
 @dataclass(frozen=True)
 class AppConfig:
     """Gesamte App-Konfiguration."""
-
     app_name: str = _env("APP_NAME", "home-miscale")
     app_version: str = _env("APP_VERSION", "2.1.0")
     host: str = _env("HOST", "0.0.0.0")
     port: int = _env_int("PORT", 5056)
     language: str = _env("LANGUAGE", "de")
     app_title: str = _env("APP_TITLE", "⚖ MiScale")
-    data_dir: str = _env("DATA_DIR", str(PROJECT_ROOT / "data"))
-    db_path: str = _env("DB_PATH", str(PROJECT_ROOT / "data" / "miscaledata.db"))
+    data_dir: str = _resolve_path(_env("DATA_DIR", ""), "data")
+    db_path: str = _resolve_path(_env("DB_PATH", ""), "data/miscaledata.db")
+    config_dir: str = _resolve_path("", "config")
 
     mqtt: MqttConfig = field(default_factory=MqttConfig)
     log: LogConfig = field(default_factory=LogConfig)
@@ -81,7 +93,7 @@ class AppConfig:
         # Frozen dataclass workaround: object.__setattr__
         import yaml
 
-        lang_file = PROJECT_ROOT / "config" / "lang" / f"{self.language}.yaml"
+        lang_file = Path(self.config_dir) / "lang" / f"{self.language}.yaml"
         if lang_file.exists():
             with open(lang_file, "r", encoding="utf-8") as f:
                 lang = yaml.safe_load(f) or {}

@@ -669,3 +669,74 @@ body {
     justify-content: space-between;
   }
 }
+/* 🔧 SEITENRAND-OPTIMIERTE APPLE HEALTH TOOLTIP ENGINE */
+.score-badge {
+    position: relative; /* Verankerungspunkt für den Tooltip */
+}
+
+/* Der schwebende Milchglas-Kasten (Fährt jetzt sicher NACH UNTEN aus) */
+.score-badge::after {
+    content: attr(data-title); /* Holt den Text live aus dem HTML */
+    position: absolute;
+    top: 130%; /* Platziert den Tooltip sicher UNTER dem Badge */
+    left: 50%;
+    transform: translateX(-50%) translateY(-5px); /* Startet leicht versetzt */
+    width: 260px;
+    padding: 12px 16px;
+    border-radius: 14px;
+
+    /* Premium Apple Milchglas-Optik */
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(229, 229, 234, 0.7);
+    color: #000000;
+
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: pre-wrap; /* Erkennt Zeilenumbrüche (\n) fehlerfrei */
+    text-align: left;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+
+    /* Unsichtbar im Ruhezustand */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 999999; /* Schwebegarantie über allen KPIs und Kurven */
+}
+
+/* Kleiner edler Pfeil nach oben am Tooltip-Kopf (Zeigt zum Badge) */
+.score-badge::before {
+    content: '';
+    position: absolute;
+    top: 116%; /* Platziert den Pfeil an die Oberkante des Tooltips */
+    left: 50%;
+    transform: translateX(-50%) translateY(-5px);
+    border-width: 6px;
+    border-style: solid;
+    /* Pfeilrichtung nach oben umgedreht! */
+    border-color: transparent transparent rgba(255, 255, 255, 0.94) transparent;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 999999;
+}
+
+/* 🔧 HIGH-CONTRAST DARKMODE ADAPTER */
+[data-theme="dark"] .score-badge::after {
+    background: rgba(28, 28, 30, 0.97);
+    border: 1px solid rgba(44, 44, 46, 0.9);
+    color: #ffffff;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+[data-theme="dark"] .score-badge::before {
+    border-color: transparent transparent rgba(28, 28, 30, 0.97) transparent;
+}
+
+/* Sichtbar machen mit flüssigem "Slide-Down" Effekt beim Hovern */
+.score-badge:hover::after,
+.score-badge:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}

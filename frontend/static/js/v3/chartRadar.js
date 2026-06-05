@@ -1,11 +1,24 @@
 // /static/js/v3/chartRadar.js
 import {
-    themeColors
+    themeColors,
+    renderChartSummaryFooter // 🔧 NEU: Importiert die universelle Footer-Funktion
 } from './chartBase.js';
 
 // 🔧 FIX: Nimmt jetzt das 'user'-Objekt für die präzise Geschlechter-Erkennung auf!
 export function renderRadarChart(timeline, updateFn, user = null) {
     const lat = timeline[timeline.length - 1] || {};
+
+    // 1. 🔧 DER RADAR-SUMMARY-FOOTER: Holt die echten Absolutwerte der LETZTEN Messung unter das Netz!
+    // Da das Radar-Chart immer nur die allerletzte Messung im Ist-Zustand zeigt,
+    // füttern wir den Footer mit einem Array, das nur aus diesem einen, letzten Element besteht.
+    // Dadurch zeigt der Footer exakt die aktuellen Absolutwerte an!
+    const singleLatestArray = [lat];
+    renderChartSummaryFooter('chartRadar', [
+        { field: 'weight', label: 'Gewicht', unit: 'kg' },
+        { field: 'fat', label: 'Fett', unit: '%' },
+        { field: 'muscle', label: 'Muskeln', unit: 'kg' },
+        { field: 'bmi', label: 'BMI', unit: '' }
+    ], singleLatestArray, singleLatestArray);
 
     // Ermittle das Geschlecht sicher über das übergebene API-User-Objekt oder den Namen
     const username = user?.name || user?.username || '';

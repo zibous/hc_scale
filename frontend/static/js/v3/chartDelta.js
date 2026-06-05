@@ -1,13 +1,25 @@
 // /static/js/v3/chartDelta.js
-import { getBaseOptions, themeColors } from './chartBase.js';
+import {
+    getBaseOptions,
+    renderChartSummaryFooter, // 🔧 NEU: Importiert die universelle Footer-Funktion
+    themeColors
+} from './chartBase.js';
 
 /**
- * Zeichnet das Delta-Balkendiagramm vertikal im exakten Stil von chartNutrition
+ * Zeichnet das Delta-Balkendiagramm vertikal im exakten Stil von chartNutrition mit Werten im Footer
  */
 export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, endDateStr) {
+    // 1. 🔧 DER SUMMARY-FOOTER FIX: Injiziert die echten Absolutwerte direkt unter das Diagramm!
+    renderChartSummaryFooter('chartDelta', [
+        { field: 'weight', label: 'Gewicht', unit: 'kg' },
+        { field: 'fat', label: 'Körperfett', unit: '%' },
+        { field: 'muscle', label: 'Muskelmasse', unit: 'kg' },
+        { field: 'water', label: 'Körperwasser', unit: '%' }
+    ], timeline, rawTimeline);
+
     const opts = getBaseOptions();
 
-    // 1. FACHLICHE WEICHE: Kurzzeitraum abfangen
+    // 2. FACHLICHE WEICHE: Kurzzeitraum abfangen
     const isShortPeriod = timeline.length < 3 || startDateStr === endDateStr;
 
     let targetData = [...timeline];
@@ -25,7 +37,7 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
 
     if (targetData.length < 2) return;
 
-    // 2. Mathematische Berechnung des Deltas
+    // 3. Mathematische Berechnung des Deltas
     const firstEntry = targetData[0];
     const lastEntry = targetData[targetData.length - 1];
 
@@ -34,7 +46,7 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
     const muscleDelta = (lastEntry.muscle && firstEntry.muscle) ? (lastEntry.muscle - firstEntry.muscle) : 0;
     const waterDelta = (lastEntry.water && firstEntry.water) ? (lastEntry.water - firstEntry.water) : 0;
 
-    // 3. Dynamischen Titel setzen
+    // 4. Dynamischen Titel setzen
     const chartCard = document.getElementById('chartDelta')?.closest('.chart-card');
     if (chartCard) {
         const titleEl = chartCard.querySelector('.chart-title');
@@ -43,7 +55,7 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
         }
     }
 
-    // 4. DIREKTE ZUWEISUNG DER DESIGN-PARAMETERN (Analog zu chartNutrition)
+    // 5. DIREKTE ZUWEISUNG DER DESIGN-PARAMETERN
     updateFn('chartDelta', {
         type: 'bar',
         data: {
@@ -51,21 +63,16 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
             datasets: [{
                 data: [weightDelta, fatDelta, muscleDelta, waterDelta],
                 backgroundColor: ['#ff453a', '#ff9f0a', '#30d158', '#0a84ff'], // Reine Markenfarben
-
-                // 🔧 SCRIPTABLE OPTION FIX: Prüft den Wert live und rundet IMMER die Spitze ab!
                 borderRadius: function(context) {
                     const index = context.dataIndex;
                     const value = context.dataset.data[index];
-
                     if (value >= 0) {
-                        // Positiver Balken: Oben abrunden, unten eckig an der Nulllinie
                         return { topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0 };
                     } else {
-                        // Negativer Balken: Unten abrunden, oben eckig an der Nulllinie
                         return { topLeft: 0, topRight: 0, bottomLeft: 8, bottomRight: 8 };
                     }
                 },
-                borderSkipped: false, // Erlaubt Rundungen in jede Richtung ohne Abschneiden
+                borderSkipped: false,
                 barPercentage: 0.85
             }]
         },
@@ -89,7 +96,7 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
             scales: {
                 x: {
                     grid: {
-                        display: false // Cleane Textachse unten ohne störende Querstriche
+                        display: false
                     },
                     ticks: {
                         color: themeColors.text,
@@ -101,7 +108,7 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
                 },
                 y: {
                     grid: {
-                        color: themeColors.grid // Führungslinien im Hintergrund
+                        color: themeColors.grid
                     },
                     ticks: {
                         color: themeColors.text,

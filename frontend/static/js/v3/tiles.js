@@ -19,35 +19,44 @@ export function renderKPITiles(timeline, startDateStr, endDateStr) {
     })
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // WICHTIGER FIX: Wenn für den gewählten Zeitraum KEINE Daten existieren
-  if (periodTimeline.length === 0) {
-    grid.innerHTML = `
-      <div class="tile" style="grid-column: 1 / -1; text-align: center; padding: 20px;">
-        <div class="tile-title" style="color: var(--apple-red);">Keine Messdaten im Zeitraum gefunden</div>
-        <div class="tile-subtext" style="margin-top: 5px;">Bitte wähle einen anderen Zeitraum aus (Gewählt: ${startDateStr} bis ${endDateStr}).</div>
-      </div>
-    `;
-    return;
-  }
-
-  // Letzter und erster Messpunkt innerhalb des Fokus
-  const latestInPeriod = periodTimeline[periodTimeline.length - 1];
-  const firstInPeriod = periodTimeline[0];
   const isSingleDay = (startDateStr === endDateStr);
 
-  // Vergleichswert für den Trend-Pfeil ermitteln
+  // 2. 🔧 ECHTER HISTORIEN-FALLBACK-FIX (Verhindert den undefined-Absturz!)
+  let latestInPeriod;
+  let firstInPeriod;
+  let isHistoricalReview = false;
+
+  if (periodTimeline.length > 0) {
+    // Wenn Daten im gewählten Zeitraum existieren
+    latestInPeriod = periodTimeline[periodTimeline.length - 1];
+    firstInPeriod = periodTimeline[0];
+  } else {
+    // Falls heute noch keine Messung vorliegt: Nimm den letzten historischen Messpunkt!
+    latestInPeriod = timeline[timeline.length - 1];
+    firstInPeriod = latestInPeriod;
+    isHistoricalReview = true;
+  }
+
+  // Vergleichswert für den Trend-Pfeil fehlerfrei ermitteln
   let comparisonEntry = firstInPeriod;
-  if (isSingleDay || periodTimeline.length < 2) {
-    const globalIndex = timeline.findIndex(t => t.id === latestInPeriod.id);
+  if (isSingleDay || periodTimeline.length < 2 || isHistoricalReview) {
+    // Sichere Suche in der Gesamthistorie per ID oder Zeitstempel
+    const globalIndex = timeline.findIndex(t => {
+      if (latestInPeriod && latestInPeriod.id && t.id) return t.id === latestInPeriod.id;
+      return new Date(t.timestamp).getTime() === new Date(latestInPeriod.timestamp).getTime();
+    });
     comparisonEntry = globalIndex > 0 ? timeline[globalIndex - 1] : latestInPeriod;
   }
 
-  // Sparkline-Verlauf festlegen
-  const historyData = isSingleDay ? timeline.slice(-7) : periodTimeline;
+  // Sparkline-Verlauf festlegen (Bei Leerlauf zeigen wir die letzten 7 Messungen gesamt)
+  const historyData = (isSingleDay || isHistoricalReview) ? timeline.slice(-7) : periodTimeline;
 
-  // 2. Dynamische Titel-Periode für die zentrale Überschrift generieren
+  // 3. Dynamische Titel-Periode für die zentrale Überschrift generieren
   let periodHeadline = '';
-  if (isSingleDay) {
+  if (isHistoricalReview) {
+    const lastMeasureDate = new Date(latestInPeriod.timestamp).toLocaleDateString('de-DE');
+    periodHeadline = `Fokus: Heute noch keine Messung <span style="font-weight: normal; color: var(--apple-orange); font-size: 13px;">(Historischer Rückblick vom ${lastMeasureDate})</span>`;
+  } else if (isSingleDay) {
     const formattedDate = new Date(latestInPeriod.timestamp).toLocaleDateString('de-DE');
     periodHeadline = `Fokus: Einzelmessung vom ${formattedDate}`;
   } else {
@@ -57,7 +66,10 @@ export function renderKPITiles(timeline, startDateStr, endDateStr) {
     periodHeadline = `Analyse-Zeitraum: ${fromDate} bis ${toDate} <span style="font-weight: normal; color: var(--text-muted); font-size: 13px;">(Letzter Messpunkt im Zeitraum: ${lastMeasureDate})</span>`;
   }
 
-  // Definition aller Waagen-Metriken
+  // 🔍 DIAGNOSE-TEST: Zeigt uns alle echten Tabellen-Spalten deiner Waage!
+  // console.error("MESSWERT-STRUKTUR DER WAAGE:", JSON.stringify(latestInPeriod, null, 2));
+
+  // Definition aller Waagen-Metriken (Impedanz durch Biologisches Alter ersetzt!)
   const metrics = [
     { id: 'w', title: 'Gewicht', val: latestInPeriod.weight, pVal: comparisonEntry.weight, unit: 'kg', color: 'var(--apple-red)', history: historyData.map(t => t.weight), min: 50, max: 100 },
     { id: 'f', title: 'Körperfett', val: latestInPeriod.fat, pVal: comparisonEntry.fat, unit: '%', color: 'var(--apple-orange)', history: historyData.map(t => t.fat), min: 5, max: 35 },
@@ -68,11 +80,10 @@ export function renderKPITiles(timeline, startDateStr, endDateStr) {
     { id: 'p', title: 'Protein', val: latestInPeriod.protein, pVal: comparisonEntry.protein, unit: '%', color: 'var(--apple-blue)', history: historyData.map(t => t.protein), min: 10, max: 25 },
     { id: 'l', title: 'Fettfreie Masse (LBM)', val: latestInPeriod.lbm, pVal: comparisonEntry.lbm, unit: 'kg', color: 'var(--apple-red)', history: historyData.map(t => t.lbm), min: 40, max: 85 },
     { id: 'po', title: 'Punkte (POI)', val: latestInPeriod.poi, pVal: comparisonEntry.poi, unit: 'Pts', color: 'var(--apple-green)', history: historyData.map(t => t.poi), min: 5, max: 20 },
-    { id: 'i', title: 'Impedanz', val: latestInPeriod.impedance, pVal: comparisonEntry.impedance, unit: 'Ω', color: '#8e8e93', history: historyData.map(t => t.impedance), min: 400, max: 800 }
+    { id: 'i', title: 'Biologisches Alter', val: latestInPeriod.metabolic_age, pVal: comparisonEntry.metabolic_age, unit: ' J.', color: '#8e8e93', history: historyData.map(t => t.metabolic_age), min: 18, max: 80 }
   ];
 
   // 3. HTML für die Überschrift und das Kachel-Grid erzeugen
-  // Wir packen die Überschrift direkt vor das Grid oder injecten ein Full-Width Element im Grid
   const tilesHtml = metrics.map(m => {
     const diff = m.val - m.pVal;
     let trendClass = 'trend-stable', trendArrow = '→', trendText = 'Stabil';
@@ -122,31 +133,93 @@ export function renderKPITiles(timeline, startDateStr, endDateStr) {
   `;
 
   // 4. Sparklines zeichnen
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
   metrics.forEach(m => {
     const canvasId = `spark_${m.id}`;
-    const ctx = document.getElementById(canvasId)?.getContext('2d');
+    const canvasEl = document.getElementById(canvasId);
+    const ctx = canvasEl?.getContext('2d');
     if (!ctx) return;
 
     if (activeSparklines[canvasId]) activeSparklines[canvasId].destroy();
 
+    // 1. Hole die leuchtende Kontrast-Farbe für die Linie
+    let lineColor = m.color;
+    if (isDark) {
+      const darkColorMap = {
+        'var(--apple-red)': '#ff453a',
+        'var(--apple-orange)': '#ff9f0a',
+        'var(--apple-green)': '#30d158',
+        'var(--apple-purple)': '#bf5af2',
+        'var(--apple-blue)': '#0a84ff',
+        '#8e8e93': '#aeaeac'
+      };
+      lineColor = darkColorMap[m.color] || m.color;
+    } else {
+      // Lightmode Kontrast-Absicherung für CSS-Variablen
+      const lightColorMap = {
+        'var(--apple-red)': '#ff3b30',
+        'var(--apple-orange)': '#ff9500',
+        'var(--apple-green)': '#34c759',
+        'var(--apple-purple)': '#af52de',
+        'var(--apple-blue)': '#007aff',
+        '#8e8e93': '#8e8e93'
+      };
+      lineColor = lightColorMap[m.color] || m.color;
+    }
+
+    // 2. 🔧 DER NEON-GLOW-FIX: Dynamischen vertikalen Farbverlauf erzeugen
+    // Wir erstellen einen Verlauf von oben (Säulen-Spitze) nach unten (Kachel-Boden)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvasEl.height || 40);
+
+    // Wir wandeln die Hex-Farbe in RGB um, um die Deckkraft exakt zu steuern
+    let rgb = '10, 132, 255'; // Fallback Blue
+    const hex = lineColor.startsWith('#') ? lineColor : '#0a84ff';
+    if (hex.startsWith('#')) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      rgb = `${r}, ${g}, ${b}`;
+    }
+
+    if (isDark) {
+      // Im Darkmode lassen wir den Verlauf oben kräftig mit 25% starten für echtes Leuchten
+      gradient.addColorStop(0, `rgba(${rgb}, 0.25)`);
+      gradient.addColorStop(1, `rgba(${rgb}, 0.0)`);
+    } else {
+      // Im Lightmode etwas dezenter, damit es nicht matschig wirkt
+      gradient.addColorStop(0, `rgba(${rgb}, 0.15)`);
+      gradient.addColorStop(1, `rgba(${rgb}, 0.0)`);
+    }
+
+    // 3. Chart instanziieren
     activeSparklines[canvasId] = new Chart(ctx, {
       type: 'line',
       data: {
         labels: m.history.map((_, i) => i),
         datasets: [{
           data: m.history,
-          borderColor: m.color,
-          borderWidth: 2,
-          pointRadius: m.history.length === 1 ? 3 : 0,
-          backgroundColor: 'transparent',
-          tension: 0.3
+          borderColor: lineColor,
+          borderWidth: 2.5, // Linie leicht dicker für bessere Sichtbarkeit
+          pointRadius: m.history.length === 1 ? 4 : 0,
+          pointBackgroundColor: lineColor,
+          backgroundColor: gradient, // Der flüssige Neon-Verlauf wird injiziert
+          fill: true,                // Fläche unter der Linie ausfüllen
+          tension: 0.35              // Macht die Kurven noch geschmeidiger
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 150 },
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
-        scales: { x: { display: false }, y: { display: false } }
+        scales: {
+          x: { display: false },
+          y: {
+            display: false,
+            offset: true // Gibt der Kurve oben und unten 10% Luft, damit sie nicht am Canvas-Rand klebt
+          }
+        }
       }
     });
   });

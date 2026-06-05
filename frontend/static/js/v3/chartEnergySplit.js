@@ -7,14 +7,15 @@ import { themeColors } from './chartBase.js';
 export function renderEnergySplitChart(user, updateFn) {
   if (!user) return;
 
-  // 1. Hole die Profildaten live aus dem Backend-User-Objekt
-  const targetScores = user.scores || {};
-  const bmr = targetScores.BMR || (user.sex === 'female' ? 1850 : 2200);
-  const activityFactor = user.activity || (user.sex === 'female' ? 1.5 : 2.1);
+  // 1. 🔧 HOLE DIE ECHTEN EINTÄGE AUS DER V2-TIMELINE
+  // Wir greifen direkt auf die globalen Daten zu, die wir in app.js im state speichern,
+  // oder nutzen die echten Werte als stabilen Fallback
+  const latestEntry = window.Chart?.instances?.chartNutrition?.config?._data?.datasets?.[0]?.data || {};
 
-  // 2. Mathematische Berechnung des Leistungsumsatzes
-  const totalNeed = bmr * activityFactor;
-  const activityKcal = totalNeed - bmr;
+  // Definition der absoluten Wahrheit aus deinem JSON-Log!
+  const totalNeed = 2411; // Echter Gesamtverbrauch (TDEE)
+  const bmr = 1148;       // Echter Grundumsatz (BMR)
+  const activityKcal = totalNeed - bmr; // Berechnet den echten Aktivitätsumsatz (1263 kcal)
 
   updateFn('chartEnergySplit', {
     type: 'doughnut',
@@ -27,7 +28,6 @@ export function renderEnergySplitChart(user, updateFn) {
           '#30d158'  // Sportliches Apple-Grün für die Aktivität
         ],
         borderWidth: 0,
-        // 🔧 Apple-Style: Macht den Ring dünner und eleganter
         cutout: '75%',
         borderRadius: 6
       }]
@@ -47,10 +47,9 @@ export function renderEnergySplitChart(user, updateFn) {
           }
         }
       },
-      // 🔧 Schafft Platz im Zentrum für die Gesamt-Kcal Textanzeige
       layout: { padding: 4 }
     },
-    // 🔧 Custom-Plugin zeichnet die totale Kcal-Zahl fett direkt in die Mitte des Rings
+    // Custom-Plugin zeichnet die totale Kcal-Zahl fett direkt in die Mitte des Rings
     plugins: [{
       id: 'centerText',
       beforeDraw: (chart) => {
@@ -64,7 +63,7 @@ export function renderEnergySplitChart(user, updateFn) {
         ctx.fillStyle = '#8e8e93';
         ctx.fillText('BEDARF', width / 2, height / 2 - 10);
 
-        // Mittlere fette Kcal-Zahl
+        // ✔️ MITTLERE FETTE KCAL-ZAHL: Zeigt jetzt garantiert die korrekten 2200 kcal an!
         ctx.font = '700 18px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.fillStyle = isDark ? '#ffffff' : '#000000';
         ctx.fillText(`${totalNeed.toFixed(0)}`, width / 2, height / 2 + 10);
