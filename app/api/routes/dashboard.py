@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 _db: DBManager | None = None
-_AVATAR_DIR = str(Path(cfg.config_dir).parent / "frontend")
+_IMAGES_DIR = str(Path(cfg.config_dir).parent / "frontend")
 
 
 def init_dashboard(db: DBManager):
@@ -108,10 +108,8 @@ async def dashboard_data(
 
         conn.close()
 
-        # --- 3. 🔧 FUSIONIERUNG: ECHTE JSON-DATEN & MESSDATUM DIREKT INJIZIEREN ---
+        # --- 3. 🔧 FUSIONIERUNG: TYP-SICHERE PATCH-LOGIK ---
         json_path = Path(cfg.data_dir) / f"miscale-{user}.json"
-
-        # Fallback: Großschreibung versuchen (z.B. miscale-Peter.json)
         if not json_path.exists():
             json_path = Path(cfg.data_dir) / f"miscale-{user.capitalize()}.json"
 
@@ -123,56 +121,54 @@ async def dashboard_data(
             except Exception:
                 log.warning(f"Konnte JSON-Datei {json_path} nicht lesen")
 
-        # Hilfsfunktion, um die fehlenden JSON-Felder inklusive Echtzeit-Datum zu patchen
         def patch_with_json(item, is_latest=False):
             if not item: return item
+            item = dict(item) # Erzwinge veränderbares Wörterbuch
 
+            # Fallbacks für Metriken aus JSON oder Standard-Werten
+            item["metabolic_age"] = item.get("metabolic_age") if item.get("metabolic_age") is not None else json_data.get("metabolic_age")
+            item["bodytype"] = item.get("bodytype") or json_data.get("bodytype", "Ausgeglichen")
+
+            # Typ-Sichere Castings für numerische Berechnungen im Frontend
+            for field, default in [("targetweight", 70.0), ("ffmi", 0.0), ("bone", 0.0), ("bmr", 1148.0), ("tdee", 2411.0)]:
+                try:
+                    item[field] = float(item.get(field) or json_data.get(field, default))
+                except (ValueError, TypeError):
+                    item[field] = default
+
+            # Nur das allerneueste Element überschreiben mit echten Live-JSON-Werten
             if is_latest and json_data:
-                item["metabolic_age"] = json_data.get("metabolic_age", None)
-                item["bmr"] = json_data.get("bmr", 1148.0)
-                item["tdee"] = json_data.get("tdee", 2411)
+                item["metabolic_age"] = json_data.get("metabolic_age", item["metabolic_age"])
+                item["bodytype"] = json_data.get("bodytype", item["bodytype"])
+                item["targetweight"] = float(json_data.get("targetweight", item["targetweight"]))
+                item["ffmi"] = float(json_data.get("ffmi", item["ffmi"]))
+                item["bone"] = float(json_data.get("bone", item["bone"]))
+                item["bmr"] = float(json_data.get("bmr", item["bmr"]))
+                item["tdee"] = float(json_data.get("tdee", item["tdee"]))
 
-                # 🔧 ZEITSTEMPEL-FIX: Konsistenter String statt Liste!
                 if "timestamp" in json_data and json_data["timestamp"]:
                     ts_str = str(json_data["timestamp"])
                     item["timestamp"] = ts_str
-                    item["date"] = ts_str[:10] # Extrahiert "YYYY-MM-DD" sauber
-            else:
-                # Fallback für die Historie/Sparklines
-                item["metabolic_age"] = item.get("metabolic_age", None)
-                item["bmr"] = item.get("bmr", 1148.0)
-                item["tdee"] = item.get("tdee", 2411)
+                    item["date"] = ts_str[:10]
+
             return item
 
-        # Veredelung anwenden: Beim letzten Eintrag schlagen die JSON-Echtzeitwerte ein!
+        # Veredelung auf die Listen anwenden
         if current_list:
             current_list[-1] = patch_with_json(current_list[-1], is_latest=True)
             for i in range(len(current_list) - 1):
                 current_list[i] = patch_with_json(current_list[i], is_latest=False)
         else:
-            # SONDERFALL-RETTUNG: Wenn heute komplett LEER ist
             if json_data:
                 ts_val = json_data.get("timestamp", datetime.now().isoformat())
-
-                virtual_today = {
-                    "id": 9999,
-                    "name": user.capitalize(),
-                    "timestamp": ts_val,
-                    "date": ts_val[:10], # 🔧 Hier ebenfalls gefixt
-                    "weight": json_data.get("weight", 0),
-                    "impedance": json_data.get("impedance", 0),
-                    "fat": json_data.get("fat", 0),
-                    "visceral": json_data.get("visceral", 0),
-                    "water": json_data.get("water", 0),
-                    "muscle": json_data.get("muscle", 0),
-                    "bmi": json_data.get("bmi", 0),
-                    "protein": json_data.get("protein", 0),
-                    "lbm": json_data.get("lbm", 0),
-                    "poi": json_data.get("poi", 0),
-                    "metabolic_age": json_data.get("metabolic_age", None),
-                    "bmr": json_data.get("bmr", 1148.0),
-                    "tdee": json_data.get("tdee", 2411)
-                }
+                virtual_today = patch_with_json({
+                    "id": 9999, "name": user.capitalize(), "timestamp": ts_val, "date": ts_val[:10],
+                    "weight": json_data.get("weight", 0.0), "impedance": json_data.get("impedance", 0),
+                    "fat": json_data.get("fat", 0.0), "visceral": json_data.get("visceral", 0.0),
+                    "water": json_data.get("water", 0.0), "muscle": json_data.get("muscle", 0.0),
+                    "bmi": json_data.get("bmi", 0.0), "protein": json_data.get("protein", 0.0),
+                    "lbm": json_data.get("lbm", 0.0), "poi": json_data.get("poi", 0.0)
+                }, is_latest=True)
                 current_list.append(virtual_today)
 
         if previous_list:
@@ -182,7 +178,7 @@ async def dashboard_data(
         current_deduped = _deduplicate_rows(current_list)
         previous_deduped = _deduplicate_rows(previous_list)
 
-        # --- 4. BENUTZER-METADATEN (Mit integriertem BMR-Sync) ---
+        # --- 4. BENUTZER-METADATEN ---
         user_meta = {"name": user, "sex": "male", "target": 70.0, "avatar": f"dashboard/avatar/{user}"}
         try:
             us = UserService()
@@ -190,7 +186,6 @@ async def dashboard_data(
             if u_info:
                 user_meta["target"] = u_info.scores.get("WEIGHT", 70.0)
                 user_meta["sex"] = u_info.sex
-                # Injiziert die echten JSON-Werte auch fest ins Benutzerprofil für die Kcal-Ringe!
                 user_meta["scores"] = {
                     **u_info.scores,
                     "BMR": json_data.get("tdee", u_info.scores.get("BMR", 2200))
@@ -198,23 +193,24 @@ async def dashboard_data(
         except Exception:
             pass
 
-        # --- 5. DYNAMISCHER RETURN JE NACH ROUTE ---
+        # --- 5. SYSTEM INFO ---
+        system_meta = {
+            "servertime": datetime.now().strftime("%Y-%m-%d um %H:%M Uhr"),
+            "apptitle": cfg.app_title, "appversion": cfg.app_version, "language": cfg.language,
+            "scale_type": "XMTZC05HM", "scale_name": "MI Body Composition Scale 2",
+            "scale_manu": "Xiaomi", "scale_image": os.path.join(_IMAGES_DIR, "miscale.png")
+        }
+
+        # --- 6. DYNAMISCHER RETURN ---
+        return_data = {
+            "system": system_meta, "user": user_meta, "current": current_deduped,
+            "previous": previous_deduped, "count": len(current_deduped)
+        }
         if is_v2_request:
-            return {
-                "user": user_meta,
-                "current": current_deduped,
-                "previous": previous_deduped,
-                "count": len(current_deduped),
-                "all_users": all_user_names
-            }
+            return_data["all_users"] = all_user_names
         else:
-            return {
-                "user": user_meta,
-                "current": current_deduped,
-                "previous": previous_deduped,
-                "count": len(current_deduped),
-                "data": current_deduped
-            }
+            return_data["data"] = current_deduped
+        return return_data
 
     except Exception:
         log.exception("Fehler beim Laden der kombinierten Dashboard-Daten")
@@ -324,15 +320,12 @@ async def dashboard_export(
 @router.get("/dashboard/avatar/{name}")
 async def dashboard_avatar(name: str):
     for ext in ("png", "jpg", "jpeg", "webp"):
-        path = os.path.join(_AVATAR_DIR, f"{name.lower()}.{ext}")
+        path = os.path.join(_IMAGES_DIR, f"{name.lower()}.{ext}")
         if os.path.isfile(path):
             return FileResponse(path)
-
     import struct
     import zlib
-
     sig = b"\x89PNG\r\n\x1a\n"
-
     def chunk(ctype, data):
         c = ctype + data
         return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)

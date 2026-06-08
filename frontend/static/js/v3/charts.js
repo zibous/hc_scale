@@ -8,6 +8,7 @@ import { renderRadarChart } from './chartRadar.js';
 import { renderNutritionChart } from './chartNutrition.js';
 import { renderDeltaChart } from './chartDelta.js';
 import { renderEnergySplitChart } from './chartEnergySplit.js';
+import { getAppleIcon } from './icons.js';
 
 const activeCharts = {};
 
@@ -85,4 +86,33 @@ export function renderAllCharts(rawTimeline, user = null, startDateStr = '', end
   }
 
   console.log(`🚀 Charts stabilisiert gezeichnet. X-Achsen-Punkte: ${dates.length} Tage.`);
+}
+
+/**
+ * 🌟 ZENTRALER CHART-TITEL-MANAGER (Neu angehängt)
+ * Definiert alle Texte und Symbole an einem Ort und injiziert sie ins HTML
+ */
+export function injectChartTitles() {
+  const chartConfig = {
+    '#titleWeight':  { icon: 'weight',  text: 'Gewicht (mit Trend) & Fettfreie Masse' },
+    '#titleSummary': { icon: 'trend',   text: 'Zusammenfassung (Gewicht / Muskeln / BMI)' },
+    '#titleFat':     { icon: 'fat',     text: 'Körperfett & Viszeralfett' },
+    '#titleMuscle':  { icon: 'muscle',  text: 'Muskeln & Protein' },
+    '#titleRadar':   { icon: 'radar',   text: 'Körperwerte (aktuell normalisiert)' },
+    '#titleEnergy':  { icon: 'energy',  text: 'Energie-Bilanz (Zufuhr vs. Verbrauch)' },
+    '#titleDelta':   { icon: 'bar',     text: 'Veränderung (Fett, Muskeln, Wasser)' }
+  };
+
+  Object.entries(chartConfig).forEach(([selector, cfg]) => {
+    const titleEl = document.querySelector(selector);
+    if (!titleEl) return;
+
+    // Erzeugt das Apple-Icon mit Größe 16px, Deckkraft 0.8, Abstand 8px und nutztcurrentColor
+    const svgIcon = getAppleIcon(cfg.icon, 16, 0.8, 8);
+    titleEl.innerHTML = `${svgIcon}<span>${cfg.text}</span>`;
+
+    // Perfektes, gerades Apple-Layout für die Überschrift erzwingen
+    titleEl.style.display = 'inline-flex';
+    titleEl.style.alignItems = 'center';
+  });
 }

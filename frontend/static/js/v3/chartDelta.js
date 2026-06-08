@@ -4,6 +4,7 @@ import {
     renderChartSummaryFooter, // 🔧 NEU: Importiert die universelle Footer-Funktion
     themeColors
 } from './chartBase.js';
+import { getAppleIcon } from './icons.js';
 
 /**
  * Zeichnet das Delta-Balkendiagramm vertikal im exakten Stil von chartNutrition mit Werten im Footer
@@ -46,12 +47,20 @@ export function renderDeltaChart(timeline, rawTimeline, updateFn, startDateStr, 
     const muscleDelta = (lastEntry.muscle && firstEntry.muscle) ? (lastEntry.muscle - firstEntry.muscle) : 0;
     const waterDelta = (lastEntry.water && firstEntry.water) ? (lastEntry.water - firstEntry.water) : 0;
 
-    // 4. Dynamischen Titel setzen
+    // 4. Dynamischen Titel setzen inklusive Apple-Health Line-Icon
     const chartCard = document.getElementById('chartDelta')?.closest('.chart-card');
     if (chartCard) {
         const titleEl = chartCard.querySelector('.chart-title');
         if (titleEl) {
-            titleEl.innerHTML = `Veränderung (Fett, Muskeln, Wasser)<span style="font-size:12px; font-weight:normal; color:var(--text-muted);">${chartSubtitle}</span>`;
+            // Holt das Icon mit Größe 16px passend zur H3-Schrift
+            const svgIcon = getAppleIcon('bar', 16);
+
+            // Baut das HTML perfekt zusammen, ohne das Icon wegzuschneiden
+            titleEl.innerHTML = `${svgIcon}<span style="margin-left: 8px;">Veränderung (Fett, Muskeln, Wasser)</span><span style="font-size:12px; font-weight:normal; color:var(--text-muted); margin-left:6px;">${chartSubtitle}</span>`;
+
+            // Apple-Health Flex-Ausrichtung erzwingen
+            titleEl.style.display = 'inline-flex';
+            titleEl.style.alignItems = 'center';
         }
     }
 

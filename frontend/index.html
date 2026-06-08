@@ -4,149 +4,122 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>BodyScale Health Dashboard</title>
-    <link rel="icon" type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FF453A'%3E%3Cpath d='M3 3h8v8H3V3zm10 0h8v5h-8V3zM3 13h5v8H3v-8zm7 0h11v8H10v-8z'/%3E%3C/svg%3E">
-      <link rel="stylesheet" href="static/css/style2.bundle.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FF453A'%3E%3Cpath d='M3 3h8v8H3V3zm10 0h8v5h-8V3zM3 13h5v8H3v-8zm7 0h11v8H10v-8z'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="static/css/style2.bundle.css">
     <!-- Chart.js v4 + Zeit-Adapter -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 </head>
 <body>
     <div class="container">
-        <!-- Die obere Menüzeile enthält nur noch den Titel und den Design-Umschalter -->
+
+        <!-- Header-Bereich -->
         <div class="header">
             <h1>BodyScale Health</h1>
             <div class="controls-group">
-                <!-- Der leere Zeitraum-Behälter bleibt hier oben perfekt aufgehoben -->
-                <div id="dateSelectorContainer">
-                    <!-- siehe dateselector.js -->
-                </div>
-                <button id="themeToggle" class="theme-toggle-btn" title="Design wechseln">🌓</button>
+                <div id="dateSelectorContainer"></div>
+                <button id="themeToggle" class="theme-toggle-btn" title="Design wechseln"></button>
             </div>
         </div>
 
-        <div id="loadBox">Verbinde mit Server...</div>
+        <div id="loadBox">Verbindbe mit Server...</div>
 
         <!-- Dashboard Content -->
         <div id="dashboardContent" style="display: none;">
 
-            <!-- Profil-Leiste  siehe: renderProfile.js -->
+            <!-- Profil-Leiste -->
             <div class="profile-bar">
-                
                 <img id="userAvatar" class="avatar" src="" alt="Avatar">
-
-                <div class="profile-info">
-                    <!--Hier injiziert JavaScript nun das Dropdown direkt in die Titelzeile -->
-                </div>
+                <div class="profile-info"></div>
             </div>
 
-            <!-- KPI Tiles see: frontend/static/js/tiles.js-->
-            <div class="kpi-grid" id="kpiGrid">
-                <!-- aktuell, daten der letzten Messung -->
-            </div>
+            <!-- KPI Gruppen-Kacheln -->
+            <div class="kpi-grid" id="kpiGrid"></div>
 
-            <!-- Charts Grid see: frontend/static/js/v3/charts.js -->
+            <!-- Diagramm-Grid (Titel und Icons werden dynamisch via charts.js befüllt) -->
             <div class="charts-grid">
 
-                <!-- /static/js/v3/chartWeight.js-->
+                <!-- Gewicht-Chart -->
                 <div class="chart-card full-width">
-                    <h3 class="chart-title">Gewicht (mit Trend) &amp; Fettfreie Masse</h3>
+                    <h3 class="chart-title" id="titleWeight"></h3>
                     <div class="chart-container">
-                        <canvas id="chartWeight">
-                            <!-- Daten timeline nach Filter Periode von-bis -->
-                        </canvas>
+                        <canvas id="chartWeight"></canvas>
                     </div>
                 </div>
 
-                <!-- /static/js/v3/chartSummary.js-->
+                <!-- Zusammenfassung-Chart -->
                 <div class="chart-card">
-                    <h3 class="chart-title">Zusammenfassung (Gewicht / Muskeln / BMI)</h3>
+                    <h3 class="chart-title" id="titleSummary"></h3>
                     <div class="chart-container">
-                        <canvas id="chartSummary">
-                            <!-- Zeit: von heute - 30 Tage  -->
-                        </canvas>
+                        <canvas id="chartSummary"></canvas>
                     </div>
                 </div>
 
-                <!-- /static/js/v3/chartFat.js -->
+                <!-- Körperfett-Chart -->
                 <div class="chart-card">
-                    <h3 class="chart-title">Körperfett &amp; Viszeralfett</h3>
+                    <h3 class="chart-title" id="titleFat"></h3>
                     <div class="chart-container">
-                        <canvas id="chartFat">
-                            <!-- Daten timeline nach Filter Periode von-bis -->
-                        </canvas>
+                        <canvas id="chartFat"></canvas>
                     </div>
                 </div>
 
-                <!-- /static/js/v3/chartMuscle.js -->
+                <!-- Muskel-Chart -->
                 <div class="chart-card">
-                    <h3 class="chart-title">Muskeln &amp; Protein</h3>
+                    <h3 class="chart-title" id="titleMuscle"></h3>
                     <div class="chart-container">
-                        <canvas id="chartMuscle">
-                            <!-- Daten timeline nach Filter Periode von-bis -->
-                        </canvas>
+                        <canvas id="chartMuscle"></canvas>
                     </div>
                 </div>
 
-                <!--  /static/js/v3/chartRadar.js -->
+                <!-- Radar-Chart -->
                 <div class="chart-card">
-                    <h3 class="chart-title">Körperwerte (aktuell normalisiert)</h3>
+                    <h3 class="chart-title" id="titleRadar"></h3>
                     <div class="chart-container">
-                        <canvas id="chartRadar">
-                            <!-- aktuell, daten der letzten Messung -->
-                        </canvas>
+                        <canvas id="chartRadar"></canvas>
                     </div>
                 </div>
 
+                <!-- Energie-Bilanz Doppel-Chart -->
                 <div class="chart-card full-width">
-                    <h3 class="chart-title">Energie-Bilanz (Zufuhr vs. Verbrauch)</h3>
+                    <h3 class="chart-title" id="titleEnergy"></h3>
                     <div style="display: flex; gap: 20px; width: 100%; height: 320px; min-width: 0;">
-                        <!--  /static/js/v3/chartNutrition.js -->
                         <div style="flex: 1; position: relative; height: 100%; min-width: 0;">
-                            <canvas id="chartNutrition">
-                                <!-- Mittelwert aus timeline -->
-                            </canvas>
+                            <canvas id="chartNutrition"></canvas>
                         </div>
-                        <!--  /static/js/v3/chartEnergySplit.js -->
                         <div style="flex: 1; position: relative; height: 100%; min-width: 0;">
-                            <canvas id="chartEnergySplit">
-                                <!-- Mathematische Berechnung des Leistungsumsatzes -->
-                            </canvas>
+                            <canvas id="chartEnergySplit"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <!-- /static/js/v3/chartDelta.js -->
+                <!-- Delta-Chart -->
                 <div class="chart-card full-width">
-                    <h3 class="chart-title">Veränderung (Fett, Muskeln, Wasser)</h3>
+                    <h3 class="chart-title" id="titleDelta"></h3>
                     <div class="chart-container">
-                        <canvas id="chartDelta">
-                            <!-- Zeit: von heute - 7 Tage  -->
-                        </canvas>
+                        <canvas id="chartDelta"></canvas>
                     </div>
                 </div>
 
             </div>
         </div>
 
+        <!-- Dashboard Footer (Tippfehler bei Jahreszahl korrigiert) -->
         <footer class="dashboard-footer">
             <div class="footer-content">
-                <span>&bull;  2026 BodyScale Health Dashboard &bull;</span>
+                <span>&bull; 2026 BodyScale Health Dashboard &bull;</span>
                 <span class="footer-separator">&bull;</span>
-                <span>&copy 2926 Peter Siebler</span>
+                <span>&copy; 2026 Peter Siebler</span>
                 <span class="footer-separator">&bull;</span>
-                <span style="color: var(--apple-green);">● System v3.10 online</span>
+                <span style="color: var(--apple-green);">● System v3.20 online</span>
             </div>
         </footer>
 
     </div>
 
+    <!-- Globaler Nachrichten-Container -->
     <div id="messageBoxContainer" class="message-container"></div>
 
-    <!-- Einstiegspunkt für ESM Module -->
-    <!-- <script type="module" src="/static/js/v3/app.js"></script> -->
+    <!-- Finales esbuild-JS-Bundle -->
     <script src="static/js/v3/app.bundle.js"></script>
 </body>
-
-
 </html>

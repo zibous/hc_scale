@@ -1,4 +1,5 @@
 // frontend/static/js/dateselector.js
+import { getAppleIcon } from './icons.js';
 
 const RELATIVE_PERIODS = {
     'Heute': 'today',
@@ -99,8 +100,11 @@ export function initDateSelector(container, onPeriodChange) {
 
     const wrap = document.createElement('div');
     wrap.className = 'ds-wrap';
+
+    const svgCalendar = getAppleIcon('calendar', 16, 0.7, 5);
+
     wrap.innerHTML = `
-        <span class="ds-label">📅 Zeitraum:</span>
+        <span class="ds-label" style="display: inline-flex; align-items: center;">${svgCalendar}Zeitraum:</span>
         <button class="ds-btn" id="dsBtn">${savedLabel}</button>
         <div class="ds-dropdown hidden" id="dsDrop">
             <div class="ds-section">Relativ</div>
@@ -123,6 +127,7 @@ export function initDateSelector(container, onPeriodChange) {
             </div>
         </div>
     `;
+
 
     container.appendChild(wrap);
 

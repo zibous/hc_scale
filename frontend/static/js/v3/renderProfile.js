@@ -1,9 +1,67 @@
 // frontend/static/js/v3/renderProfile.js
+import { createProfileLeftHtml } from './renderProfile-ui.js';
+import { createScoreBadge } from './render-scorebadge.js';
+
+// 🌟 DYNAMISCHES INLINE-CSS FÜR DAS GESAMTE PROFIL-LAYOUT
+if (!document.getElementById('profile-core-styles')) {
+  const style = document.createElement('style');
+  style.id = 'profile-core-styles';
+  style.textContent = `
+    .profile-main-layout {
+      background: var(--card-bg, #ffffff);
+      border-radius: 24px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      gap: 24px;
+      border: 1px solid var(--card-border, rgba(0, 0, 0, 0.04));
+      box-shadow: var(--shadow-sm);
+      box-sizing: border-box;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+    .profile-status-side {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .score-badge {
+      padding: 10px 14px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 80px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid transparent;
+      box-sizing: border-box;
+    }
+    .badge-success { background-color: rgba(52, 199, 89, 0.12); border-color: rgba(52, 199, 89, 0.2); }
+    .badge-success .score-badge-value { color: var(--apple-green, #34c759); }
+    .badge-danger { background-color: rgba(255, 59, 48, 0.12); border-color: rgba(255, 59, 48, 0.2); }
+    .badge-danger .score-badge-value { color: var(--apple-red, #ff3b30); }
+    .badge-info { background-color: rgba(0, 122, 255, 0.12); border-color: rgba(0, 122, 255, 0.2); }
+    .badge-info .score-badge-value { color: var(--apple-blue, #007aff); }
+    .score-badge-title { font-size: 10px; font-weight: 700; color: var(--text-muted, #8e8e93); text-transform: uppercase; margin-bottom: 4px; }
+    .score-badge-value { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .score-badge-status { font-size: 11px; font-weight: 700; text-transform: capitalize; color: var(--text-muted, #8e8e93); }
+    .ring-container { position: relative; width: 76px; height: 76px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 12px; }
+    .ring-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+    .ring-bg { fill: transparent; stroke: var(--bg-color, #f2f2f7); stroke-width: 6; }
+    .ring-fill { fill: transparent; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s; }
+    .ring-text { position: absolute; font-size: 11px; font-weight: 700; color: var(--text-main, #000000); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
+    [data-theme="dark"] .score-badge-title { color: var(--text-main, #ffffff); opacity: 0.7; }
+    [data-theme="dark"] .ring-bg { stroke: #2c2c2e; }
+  `;
+  document.head.appendChild(style);
+}
 
 /**
  * Befüllt die Profil-Leiste und platziert den Meilenstein-Ring als edlen Abschluss ganz rechts
  */
-export function renderProfile(user, latest, timeline, allUsers = [], onUserChange = null) {
+export function renderProfile(user, system, latest, timeline, allUsers = [], onUserChange = null) {
   const profileContainer = document.querySelector('.profile-info');
   const avatarEl = document.getElementById('userAvatar');
 
@@ -68,105 +126,17 @@ export function renderProfile(user, latest, timeline, allUsers = [], onUserChang
   const ringCircumference = 2 * Math.PI * 32;
   const ringOffset = ringCircumference - (progressPercent / 100) * ringCircumference;
 
-  // 4. 🔧 SCORE BADGES: Mit unfehlbarer Tooltip-Absicherung gegen undefined-Ziele
-    // 4. 🔧 LOGIK-FIX: Biologisch und mathematisch korrekte Farb-Ampel für jedes Badge
-  function createScoreBadge(title, current, targetInput, unit = '', isNegativeMetric = false) {
-    if (!current) return '';
-
-    // Zwingt targetInput auf eine gültige Zahl, falls die DB undefined liefert
-    const target = typeof targetInput === 'number' && !isNaN(targetInput) ? targetInput : (current || 0);
-    const diff = current - target;
-
-    let icon = '●';
-    let bgClass = 'badge-success'; // Standard: Grün (Optimal)
-    let statusText = 'Optimal';
-
-    // Ein Toleranzbereich von 0.5 Einheiten gilt im Profil als biologisch perfekt eingependelt
-    if (Math.abs(diff) <= 0.5) {
-      icon = '●';
-      bgClass = 'badge-success';
-      statusText = 'Optimal';
-    } else {
-      if (diff > 0) {
-        // --- POSITIVE ABWEICHUNG (+) ---
-        icon = '▲';
-        statusText = `+${diff.toFixed(1)} ${unit}`;
-
-        // Wenn eine Metrik negativ ist (z.B. Fett hoch), färbe sie ROT (danger).
-        // Wenn sie positiv ist (z.B. Muskeln hoch), färbe sie GRÜN (success).
-        bgClass = isNegativeMetric ? 'badge-danger' : 'badge-success';
-      } else {
-        // --- NEGATIVE ABWEICHUNG (-) ---
-        icon = '▼';
-        statusText = `${diff.toFixed(1)} ${unit}`;
-
-        // Wenn eine Metrik negativ ist (z.B. Fett runter), färbe sie GRÜN (success).
-        // Wenn sie positiv ist (z.B. Muskeln runter), färbe sie ROT (danger).
-        bgClass = isNegativeMetric ? 'badge-success' : 'badge-danger';
-      }
-    }
-
-    // 🔧 GEWICHTS-SONDERREGELUNG: Mehr Gewicht = Rot/Orange, Weniger Gewicht = Blau/Grün
-    if (title === 'Gewicht') {
-      statusText = diff > 0 ? `+${diff.toFixed(1)} ${unit}` : `${diff.toFixed(1)} ${unit}`;
-      bgClass = diff > 0 ? 'badge-danger' : (weightDiff < 0 ? 'badge-info' : 'badge-success');
-      icon = diff > 0 ? '▲' : '▼';
-    }
-
-    // INFOTEXT FÜR DEN GRAPHISCHEN APPLE-TOOLTIP
-    const tooltipExplanation = `📊 METRIK: ${title.toUpperCase()}\n\n` +
-      `● Aktuell: ${current.toFixed(1)} ${unit}\n` +
-      `● Zielwert: ${target.toFixed(1)} ${unit}\n` +
-      `● Abweichung: ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} ${unit}\n\n` +
-      `Bewertung basiert auf deinem Profil-Sollwert.`;
-
-    return `
-      <div class="score-badge ${bgClass}" data-title="${tooltipExplanation}" style="cursor: help;">
-        <span class="score-badge-title">${title}</span>
-        <span class="score-badge-value">${icon} ${current.toFixed(1)}${unit}</span>
-        <span class="score-badge-status">${statusText}</span>
-      </div>
-    `;
-  }
-
-  let targetMessage = '';
-  if (weightDiff > 0) {
-    targetMessage = ` &bull; Noch <strong>${weightDiff.toFixed(1)} kg</strong> bis zum Wunschgewicht`;
-  } else if (weightDiff < 0) {
-    targetMessage = ` &bull; <strong>${Math.abs(weightDiff).toFixed(1)} kg</strong> unter Wunschgewicht`;
-  } else {
-    targetMessage = ` &bull; <strong>Punktlandung! 🎉</strong>`;
-  }
-
   const dropdownOptions = allUsers.map(u => {
     const isSelected = u.name.toLowerCase() === user.name.toLowerCase() ? 'selected' : '';
     return `<option value="${u.name}" ${isSelected}>${u.name.toUpperCase()}</option>`;
   }).join('');
 
-  // 5. Das bereinigte Layout im DOM injizieren
+  // 4. Das bereinigte Layout im DOM injizieren
   profileContainer.innerHTML = `
     <div class="profile-main-layout">
 
-      <!-- Linker Block: Textdaten -->
-      <div class="profile-left-combined">
-        <div class="profile-text-side">
-          <div class="profile-title-row">
-            <select id="userSelect" class="profile-user-select">
-              ${dropdownOptions}
-            </select>
-            <span class="status-badge ${isActive ? 'status-active' : 'status-inactive'}">
-              ${isActive ? '● Aktiv' : '● Inaktiv'}
-            </span>
-          </div>
-          <p class="profile-meta-main">
-            Geschlecht: ${user.sex === 'female' ? 'Weiblich' : 'Männlich'} &bull; Wunschgewicht: <strong>${targetWeight} kg</strong>${targetMessage}
-          </p>
-          <p class="profile-meta-secondary">
-            Letzte Messung: <strong>${dateStr}</strong> um <strong>${timeStr} Uhr</strong> &bull;
-            <strong>${timeline.length}</strong> Messungen im ausgewählten Zeitraum
-          </p>
-        </div>
-      </div>
+      <!-- Linker Block: Textdaten mit den edlen Apple-Health Line Icons -->
+      ${createProfileLeftHtml(dropdownOptions, isActive, dateStr, timeStr, timeline.length, system.servertime)}
 
       <!-- Mittlerer Block: Die vier farbigen Status-Tiles -->
       <div class="profile-status-side">

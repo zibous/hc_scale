@@ -1,4 +1,5 @@
 // /static/js/v3/messageBox.js
+import { getAppleIcon } from './icons.js';
 
 if (!document.getElementById('health-msg-styles')) {
   const style = document.createElement('style');
@@ -42,12 +43,11 @@ if (!document.getElementById('health-msg-styles')) {
     }
 
     /* 🔧 100% BRUTALER DARKMODE ADAPTER */
-    /* Greift unbarmherzig, sobald das data-theme auf dark springt, völlig egal auf welchem Element! */
     [data-theme="dark"] .health-toast-box {
-        background-color: #010101 !important; /* Tiefdunkles, sattes Anthrazit-Schwarz */
-        border: 1px solid #2c2c2e !important;   /* Knallharte, hellgraue Trennkante */
-        color: #ffffff !important;               /* Kristallweißer Text */
-        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important; /* Maximaler, fetter Eigenschatten */
+        background-color: #010101 !important;
+        border: 1px solid #2c2c2e !important;
+        color: #ffffff !important;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
     }
 
     /* Farbige Statusbalken links */
@@ -79,15 +79,25 @@ export function showMessage(text, type = 'info') {
     document.body.appendChild(container);
   }
 
-  const icons = { info: 'ℹ️', success: '✅', error: '⚠️' };
+  // 🌟 EMOMJIS GEGEN APPLE LINE-ICONS ERSETZT
+  // Info nutzt das Trend-Auge, Success das Waagen-Häkchen, Error den Energie-Blitz
+  const iconName = type === 'success' ? 'weight' : (type === 'error' ? 'energy' : 'trend');
+  const iconColor = type === 'success' ? 'var(--apple-green)' : (type === 'error' ? 'var(--apple-red)' : 'var(--apple-blue)');
+  const svgIcon = getAppleIcon(iconName, 18, iconColor);
+
   const box = document.createElement('div');
   box.className = `health-toast-box h-msg-${type}`;
-  box.innerHTML = `<span style="font-size: 16px;">${icons[type] || '🔔'}</span><div style="flex:1; line-height: 1.4;">${text}</div>`;
+  box.innerHTML = `${svgIcon}<div style="flex:1; line-height: 1.4;">${text}</div>`;
 
   container.appendChild(box);
 
+  // Erfolgsmeldungen verschwinden super knackig nach 500ms, Fehler bleiben 4s
+  const displayDuration = type === 'success' ? 1500 : 4000;
+
   setTimeout(() => {
-    box.classList.add('health-toast-out');
-    box.addEventListener('transitionend', () => box.remove());
-  }, 4000);
+    if (box) {
+      box.classList.add('health-toast-out');
+      box.addEventListener('transitionend', () => box.remove());
+    }
+  }, displayDuration);
 }

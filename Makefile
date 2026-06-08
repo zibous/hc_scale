@@ -29,6 +29,20 @@ dev1: ## Startet lokal mit auto-reload
 # ---------------------------------------------------------
 # Docker
 # ---------------------------------------------------------
+
+check-config: ## YAML-Syntax und Struktur prüfen
+	docker compose config
+
+check-build: ## Simuliert den Build-Prozess (Trockenlauf)
+	docker compose --dry-run up --build -d
+
+check-dockerfiles: # Nutzt den schnellen Buildkit-Check für alle Dockerfiles im Compose-File
+	BUILDKIT_DOCKERFILE_CHECK=1 docker compose build
+
+# 4. Kombiniert alle Prüfungen in einem Rutsch
+check-buildall: config check-dockerfiles
+	@echo "✅ Alles sieht gut aus! Bereit für den echten Build."
+
 build: ## Build Docker image
 	@echo "Baue Docker image"
 	# docker build -t hc_scale:$(VERSION) -t hc_scale:latest .
