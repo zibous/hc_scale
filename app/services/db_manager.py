@@ -165,3 +165,51 @@ class DBManager:
         except Exception:
             log.exception("DB get_history fehlgeschlagen")
             return []
+
+    def get_dashboard_users(self) -> list[dict]:
+        """Holt die aggregierten User-Daten für das Dashboard."""
+        sql = """
+            SELECT id, name, COUNT(*) as count, MIN(date) as first, MAX(date) as last
+            FROM daily_miscale
+            GROUP BY name
+            ORDER BY id
+        """
+        try:
+            with self._connect() as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(sql).fetchall()
+                return [dict(r) for r in rows]
+        except Exception:
+            log.exception("DB get_dashboard_users fehlgeschlagen")
+            return []
+
+    def generate_csv_export(self, user: str, date_from: str = "", date_to: str = "") -> tuple[str, str]:
+        """Generiert den CSV-String und den passenden Dateinamen."""
+        # 1. Dynamisches SQL
+        sql = "SELECT * FROM daily_miscale WHERE LOWER(name) = ?"
+        params = [user.lower()]
+        if date_from:
+            sql += " AND date >= ?"
+            params.append(date_from)
+        if date_to:
+            sql += " AND date <= ?"
+            params.append(date_to)
+        sql += " ORDER BY date"
+
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, tuple(params)).fetchall()
+
+        # 2. CSV schreiben (Nutzt CSV_FIELDS direkt aus der Klasse)
+        from io import StringIO
+        buf = StringIO()
+        writer = csv.DictWriter(buf, fieldnames=CSV_FIELDS, delimiter=";", extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows([dict(r) for r in rows])
+
+        # 3. Dateiname bestimmen
+        filename = f"miscale-{user.lower()}.csv"
+        if date_from:
+            filename = f"miscale-{user.lower()}-{date_from}.csv"
+
+        return buf.getvalue(), filename

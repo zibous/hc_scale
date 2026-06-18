@@ -11,7 +11,8 @@ const renderTiles = renderGroupedTiles;
 export const state = {
   lastTimeline: [], currentFrom: '', currentTo: '',
   usersCache: [], triggerSelectorRefresh: null,
-  pollingInterval: null, lastKnownCount: 0
+  pollingInterval: null, lastKnownCount: 0,
+  currentFetchController: null
 };
 
 const appVersion = "3.2.0";
@@ -155,6 +156,13 @@ async function initUserDropdown() {
 
 async function loadDashboard(username, isSilent = false) {
   if (!username) return;
+
+  // Vorherigen Request abbrechen falls noch laufend
+  if (state.currentFetchController) {
+    state.currentFetchController.abort();
+  }
+  state.currentFetchController = new AbortController();
+
   if (!isSilent) {
     const grid = document.getElementById('kpiGrid');
     if (!grid || grid.children.length <= 1) {
@@ -166,7 +174,7 @@ async function loadDashboard(username, isSilent = false) {
 
   try {
     let url = `dashboard/api/datav2?user=${username.toLowerCase()}&from=${state.currentFrom}&to=${state.currentTo}`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: state.currentFetchController.signal });
     const payload = await response.json();
     if ((payload.current && payload.current.length > 0) || (payload.previous && payload.previous.length > 0)) {
       updateDashboardUI(payload, username);
@@ -200,6 +208,7 @@ async function loadDashboard(username, isSilent = false) {
       if (!isSilent) showMessage('Keine Messwerte im gewählten Zeitraum vorhanden.', 'info');
     }
   } catch (err) {
+    if (err.name === 'AbortError') return; // Request wurde durch neueren ersetzt
     console.error('Dashboard Ladefehler:', err);
     if (!isSilent) showMessage('Fehler beim Laden der Benutzerdaten.', 'error');
   }

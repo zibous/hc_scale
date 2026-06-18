@@ -71,6 +71,7 @@ export function initDateSelector(container, onPeriodChange) {
             .ds-btn::after { content: " ▾"; opacity: .6; }
             .ds-dropdown {
                 position: absolute;
+                right: 0;
                 top: calc(100% + 8px);
                 min-width: 240px;
                 border-radius: 16px;

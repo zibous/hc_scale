@@ -17,7 +17,6 @@
         <div class="header">
             <h1>BodyScale Health</h1>
             <div class="controls-group">
-                <div id="dateSelectorContainer"></div>
                 <button id="themeToggle" class="theme-toggle-btn" title="Design wechseln"></button>
             </div>
         </div>
@@ -41,7 +40,10 @@
 
                 <!-- Gewicht-Chart -->
                 <div class="chart-card full-width">
-                    <h3 class="chart-title" id="titleWeight"></h3>
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <h3 class="chart-title" id="titleWeight"></h3>
+                        <div id="dateSelectorContainer"></div>
+                    </div>
                     <div class="chart-container">
                         <canvas id="chartWeight"></canvas>
                     </div>
@@ -120,6 +122,8 @@
     <div id="messageBoxContainer" class="message-container"></div>
 
     <!-- Finales esbuild-JS-Bundle -->
-    <script src="static/js/v3/app.bundle.js"></script>
+    <!-- <script type="module" src="static/js/v3/app.js"></script> -->
+    <script type="module" src="static/js/v3/app.bundle.js"></script>
+
 </body>
 </html>

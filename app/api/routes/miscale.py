@@ -8,6 +8,7 @@ Debounce: Sammelt Messungen pro User, verarbeitet nach 30s Ruhe.
 import logging
 import re
 import threading
+import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -28,7 +29,9 @@ _mqtt = None
 
 # Debounce
 _pending: dict[str, dict] = {}
+_lock = threading.Lock()
 DEBOUNCE_SECONDS = 30
+MAX_DEBOUNCE_SECONDS = 60  # Maximale Wartezeit – danach wird verarbeitet, auch wenn noch Posts kommen
 
 
 def init_services(user_service, db, mqtt_client):
@@ -53,7 +56,8 @@ def _normalize_ts(ts: str) -> str:
 
 def _process_measurement(user_key: str):
     """Wird nach DEBOUNCE_SECONDS ohne neue Messung aufgerufen."""
-    entry = _pending.pop(user_key, None)
+    with _lock:
+        entry = _pending.pop(user_key, None)
     if not entry:
         return
 
@@ -63,7 +67,7 @@ def _process_measurement(user_key: str):
     timestamp = entry["timestamp"]
     user_id = entry["id"]
 
-    log.info("Verarbeite: user=%s weight=%.2f impedance=%d", user.name, weight, impedance)
+    log.info("Verarbeite: user=%s weight=%.2f impedance=%d timestamp=%s", user.name, weight, impedance, timestamp)
 
     calc = CalcData(user, weight, impedance, timestamp)
     body_data = calc.calculate()
@@ -125,32 +129,56 @@ async def miscale(request: Request):
         notify_ha("unknown_user", weight=weight, name=data.get("name", ""))
         return JSONResponse({"status": "ignored", "reason": "unknown user"})
 
-    log.info("Messung empfangen: user=%s weight=%.2f impedance=%d", user.name, weight, impedance)
+    log.info("Messung empfangen: user=%s weight=%.2f impedance=%d timestamp=%s", user.name, weight, impedance, _normalize_ts(data.get("timestamp", "")))
 
-    # Debounce
+    # Debounce mit Max-Timeout
     key = user.name.lower()
-    if key in _pending and _pending[key].get("timer"):
-        _pending[key]["timer"].cancel()
 
-    user_id = 0
-    if _user_service:
-        try:
-            user_id = next(
-                (i + 1 for i, u in enumerate(_user_service.all_users()) if u.name.lower() == user.name.lower()), 0
-            )
-        except Exception:
-            pass
+    with _lock:
+        existing = _pending.get(key)
 
-    _pending[key] = {
-        "user": user,
-        "id": user_id,
-        "weight": weight,
-        "impedance": impedance,
-        "timestamp": _normalize_ts(data.get("timestamp", "")),
-        "timer": threading.Timer(DEBOUNCE_SECONDS, _process_measurement, args=[key]),
-    }
+        if existing and existing.get("timer"):
+            existing["timer"].cancel()
 
-    _pending[key]["timer"].daemon = True
-    _pending[key]["timer"].start()
+        user_id = 0
+        if _user_service:
+            try:
+                user_id = next(
+                    (i + 1 for i, u in enumerate(_user_service.all_users()) if u.name.lower() == user.name.lower()), 0
+                )
+            except Exception:
+                pass
+
+        now = time.time()
+
+        # first_seen beibehalten wenn bereits vorhanden
+        first_seen = existing["first_seen"] if existing and "first_seen" in existing else now
+
+        # Max-Timeout erreicht → sofort verarbeiten statt neuen Timer starten
+        if (now - first_seen) >= MAX_DEBOUNCE_SECONDS:
+            _pending[key] = {
+                "user": user,
+                "id": user_id,
+                "weight": weight,
+                "impedance": impedance,
+                "timestamp": _normalize_ts(data.get("timestamp", "")),
+                "first_seen": first_seen,
+            }
+            log.info("Max-Debounce erreicht für %s (%.0fs) → verarbeite sofort", user.name, now - first_seen)
+            threading.Thread(target=_process_measurement, args=[key], daemon=True).start()
+            return {"status": "ok", "user": user.name, "weight": weight}
+
+        _pending[key] = {
+            "user": user,
+            "id": user_id,
+            "weight": weight,
+            "impedance": impedance,
+            "timestamp": _normalize_ts(data.get("timestamp", "")),
+            "first_seen": first_seen,
+            "timer": threading.Timer(DEBOUNCE_SECONDS, _process_measurement, args=[key]),
+        }
+
+        _pending[key]["timer"].daemon = True
+        _pending[key]["timer"].start()
 
     return {"status": "ok", "user": user.name, "weight": weight}

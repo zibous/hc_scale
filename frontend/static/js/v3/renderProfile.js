@@ -9,14 +9,13 @@ if (!document.getElementById('profile-core-styles')) {
   style.textContent = `
     .profile-main-layout {
       background: var(--card-bg, #ffffff);
-      border-radius: 24px;
       padding: 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       width: 100%;
       gap: 24px;
-      border: 1px solid var(--card-border, rgba(0, 0, 0, 0.04));
+      border: none;
       box-shadow: var(--shadow-sm);
       box-sizing: border-box;
       transition: background-color 0.3s, border-color 0.3s;

@@ -1,39 +1,43 @@
-:root {
-    --bg-color: #f2f2f7;
-    --card-bg: #ffffff;
-    --card-border: rgba(0, 0, 0, 0.04);
-    --text-main: #000000;
-    --text-muted: #8e8e93;
-    --text-contrast: #ffffff;
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
-    --apple-red: #ff3b30;
-    --apple-blue: #007aff;
-    --apple-green: #34c759;
-    --apple-orange: #ff9500;
-    --apple-purple: #af52de;
-    --tile-trend-bg-up: rgba(255, 59, 48, 0.08);
-    --tile-trend-bg-down: rgba(52, 199, 89, 0.08);
-    --tile-trend-bg-stable: rgba(142, 142, 147, 0.08)
-}
+@import "./theme.css";
 
-[data-theme=dark] {
-    --bg-color: #000000;
-    --card-bg: #1c1c1e;
+/* App-spezifische Variablen (Aliase für bestehendes CSS) */
+:root,
+[data-theme="dark"] {
+    --bg-color: var(--bg);
+    --card-bg: var(--surface);
     --card-border: rgba(255, 255, 255, 0.06);
-    --text-main: #ffffff;
-    --text-muted: #aeaea2;
+    --text-main: var(--text);
+    --text-muted: var(--text-muted);
     --text-contrast: #000000;
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-    --apple-red: #ff453a;
-    --apple-blue: #0a84ff;
-    --apple-green: #30d158;
-    --apple-orange: #ff9f0a;
-    --apple-purple: #bf5af2;
+    --shadow-sm: var(--shadow-sm);
+    --shadow-md: var(--shadow-md);
+    --apple-red: var(--red);
+    --apple-blue: var(--accent);
+    --apple-green: var(--green);
+    --apple-orange: var(--orange);
+    --apple-purple: var(--purple);
     --tile-trend-bg-up: rgba(255, 69, 58, 0.15);
     --tile-trend-bg-down: rgba(48, 209, 88, 0.15);
     --tile-trend-bg-stable: rgba(142, 142, 147, 0.15)
+}
+
+[data-theme="light"] {
+    --bg-color: var(--bg);
+    --card-bg: var(--surface);
+    --card-border: rgba(0, 0, 0, 0.04);
+    --text-main: var(--text);
+    --text-muted: var(--text-muted);
+    --text-contrast: #ffffff;
+    --shadow-sm: var(--shadow-sm);
+    --shadow-md: var(--shadow-md);
+    --apple-red: #ff3b30;
+    --apple-blue: var(--accent);
+    --apple-green: var(--green);
+    --apple-orange: var(--orange);
+    --apple-purple: var(--purple);
+    --tile-trend-bg-up: rgba(255, 59, 48, 0.08);
+    --tile-trend-bg-down: rgba(52, 199, 89, 0.08);
+    --tile-trend-bg-stable: rgba(142, 142, 147, 0.08)
 }
 
 body {

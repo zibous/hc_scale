@@ -43,3 +43,28 @@ class UserService:
                     best = u
                     best_score = score
         return best
+
+    def enrich_database_users(self, db_users: list[dict]) -> list[dict]:
+        """Reichert rohe DB-User-Daten mit Profilen aus der YAML an."""
+        # Schnelles Dictionary für O(1) Suche erstellen
+        user_map = {u.name.lower().strip(): u for u in self.users}
+
+        for r in db_users:
+            # Avatar-Pfad erstellen
+            r["avatar"] = f"dashboard/avatar/{r['name'].lower()}"
+
+            # Profildaten aus der YAML zuordnen
+            user = user_map.get(r["name"].lower().strip())
+            if user:
+                scores = getattr(user, "scores", {}) or {}
+                r["target_weight"] = scores.get("WEIGHT", 0)
+                r["weight_threshold"] = getattr(user, "weight_threshold", None)
+                r["sex"] = getattr(user, "sex", None)
+            else:
+                r["target_weight"] = 0
+                r["weight_threshold"] = None
+                r["sex"] = None
+
+        return db_users
+
+
