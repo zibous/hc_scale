@@ -11,15 +11,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 </head>
 <body>
-    <div class="container">
 
-        <!-- Header-Bereich -->
-        <div class="header">
+    <!-- Header-Bereich -->
+    <div class="header">
+        <div class="title-info">
             <h1>BodyScale Health</h1>
-            <div class="controls-group">
-                <button id="themeToggle" class="theme-toggle-btn" title="Design wechseln"></button>
-            </div>
+            <div class="subtitle" id="subtitle">Berechnung Körperdaten</div>
         </div>
+        <div class="controls-group">
+            <button id="themeToggle" class="theme-toggle-btn" title="Design wechseln"></button>
+        </div>
+    </div>
+
+    <div class="container">
 
         <div id="loadBox">Verbindbe mit Server...</div>
 
@@ -104,19 +108,17 @@
 
             </div>
         </div>
-
-        <!-- Dashboard Footer (Tippfehler bei Jahreszahl korrigiert) -->
-        <footer class="dashboard-footer">
-            <div class="footer-content">
-                <span>&bull; 2026 BodyScale Health Dashboard &bull;</span>
-                <span class="footer-separator">&bull;</span>
-                <span>&copy; 2026 Peter Siebler</span>
-                <span class="footer-separator">&bull;</span>
-                <span style="color: var(--apple-green);">● System v3.20 online</span>
-            </div>
-        </footer>
-
     </div>
+
+   <footer class="dashboard-footer">
+        <div class="footer-content">
+            <span>&bull; 2026 BodyScale Health Dashboard &bull;</span>
+            <span class="footer-separator">&bull;</span>
+            <span>&copy; 2026 Peter Siebler</span>
+            <span class="footer-separator">&bull;</span>
+            <span style="color: var(--apple-green);">● System v3.20 online</span>
+        </div>
+    </footer>
 
     <!-- Globaler Nachrichten-Container -->
     <div id="messageBoxContainer" class="message-container"></div>
