@@ -24,11 +24,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initUserDropdown();
 
+  // 🏋️‍♂️ Aktiviert das Hintergrundbild im jetzt leeren rechten Header-Bereich
+  initHeaderBackground();
+
   setTimeout(() => {
     injectChartTitles();
   }, 10);
 
-  $('#themeToggle').addEventListener('click', toggleTheme);
+  // 🌟 FIX: Klick-Event auf das Footer-Element gelegt
+  const footerToggle = document.getElementById('themeToggleFooter');
+  if (footerToggle) {
+    footerToggle.addEventListener('click', toggleTheme);
+  }
+
   startSmartPolling(5);
 });
 
@@ -40,8 +48,27 @@ window.addEventListener('resize', () => {
   }
 });
 
+/**
+ * Injiziert die Hantel-Puls Grafik nahtlos in den Header
+ */
+function initHeaderBackground() {
+  const header = $('.header');
+  if (!header) return;
+  // Erstellt den Container für das Hintergrundbild
+  const wrapper = document.createElement('div');
+  wrapper.className = 'header-bg-wrapper';
+
+  // Ruft das neue Icon aus deiner icons.js ab:
+  // Parameter: (name="bgGym", size=75, opacity=0.15)
+  // export function getAppleIcon(name, size = 16, opacity = 1.0, marginRight = 0, color = 'currentColor', className = '') {
+  wrapper.innerHTML = getAppleIcon('bgGym', 85, 0.45, 0,'#ff3b30');
+
+  // Fügt das Element als letztes Kind in den Header ein
+  header.appendChild(wrapper);
+}
+
 function initTheme() {
-  const savedTheme = localStorage.getItem(STORAGE_THEME_KEY) || 'light'; // 🌟 FIX: Tippfehler repariert
+  const savedTheme = localStorage.getItem(STORAGE_THEME_KEY) || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
   updateThemeButtonIcon(savedTheme);
 }
@@ -67,16 +94,17 @@ function toggleTheme() {
 }
 
 /**
- * 🌟 DYNAMISCHER BUTTON-ICON-MANAGER (Korrigierte Parameter-Reihenfolge)
+ * 🌟 FIX: Aktualisiert jetzt den Text im Footer statt dem alten Header-Button
  */
 function updateThemeButtonIcon(theme) {
-  const btn = document.getElementById('themeToggle');
+  const btn = document.getElementById('themeToggleFooter');
   if (!btn) return;
 
-  const iconName = theme === 'dark' ? 'sun' : 'moon';
-
-  // 🌟 FIX: Größe 16px, Deckkraft 1.0 (voll sichtbar), rechter Abstand 0px
-  btn.innerHTML = getAppleIcon(iconName, 16, 1.0, 0);
+  if (theme === 'dark') {
+    btn.innerHTML = '☀️ Helles Design';
+  } else {
+    btn.innerHTML = '🌙 Dunkles Design';
+  }
 }
 
 /**
@@ -157,7 +185,6 @@ async function initUserDropdown() {
 async function loadDashboard(username, isSilent = false) {
   if (!username) return;
 
-  // Vorherigen Request abbrechen falls noch laufend
   if (state.currentFetchController) {
     state.currentFetchController.abort();
   }
@@ -181,8 +208,6 @@ async function loadDashboard(username, isSilent = false) {
 
       if (!isSilent) {
         showMessage(`Daten für ${username.toUpperCase()} geladen.`, 'success');
-
-        // 🌟 DER CSS-STRIKE-TRACKER: Macht die Nachricht systemweit sofort unsichtbar!
         setTimeout(() => {
           const styleOverride = document.createElement('style');
           styleOverride.id = 'temp-msg-hide';
@@ -208,7 +233,7 @@ async function loadDashboard(username, isSilent = false) {
       if (!isSilent) showMessage('Keine Messwerte im gewählten Zeitraum vorhanden.', 'info');
     }
   } catch (err) {
-    if (err.name === 'AbortError') return; // Request wurde durch neueren ersetzt
+    if (err.name === 'AbortError') return;
     console.error('Dashboard Ladefehler:', err);
     if (!isSilent) showMessage('Fehler beim Laden der Benutzerdaten.', 'error');
   }
@@ -217,6 +242,6 @@ async function loadDashboard(username, isSilent = false) {
 // ─── App Info ───────────────────────────────────────────
 console.info(
   `%c 🌟 BodyScale Health Dashboard %c ESM v${appVersion} `,
-  'color:#fff;background:#e94560;padding:4px 8px;border-radius:4px 0 0 4px;font-size:11px',
-  'color:#1a1a2e;background:#a8dadc;padding:4px 8px;border-radius:0 4px 4px 0;font-size:11px'
+  'color:#fff;background:#e94560;padding:4px 8px;border-radius:4px;',
+  'color:#fff;background:#1a1a2e;padding:4px 8px;border-radius:4px;'
 );

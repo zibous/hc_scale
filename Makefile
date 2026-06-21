@@ -138,7 +138,7 @@ jsbuild: ## 🔧 Komprimiert JS und CSS parallel über Docker – maximal optimi
 	@cp ../shared/themes/theme.css frontend/static/css/theme.css
 	@docker run --rm -v "$$(pwd)":/app -w /app node:20-alpine sh -c "\
 		npx esbuild frontend/static/js/v3/app.js --bundle --minify --sourcemap --target=es2020 --outfile=frontend/static/js/v3/app.bundle.js && \
-		npx esbuild frontend/static/css/style2.css --bundle --minify --sourcemap --outfile=frontend/static/css/style2.bundle.css"
+		npx esbuild frontend/static/css/style2.css --bundle --minify --sourcemap --loader:.svg=file --outfile=frontend/static/css/style2.bundle.css"
 	@echo "✅ Fertig!"
 
 jsclean: ## 🔧 Komprimiert JS und CSS entfernen

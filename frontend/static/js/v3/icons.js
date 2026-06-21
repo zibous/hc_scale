@@ -2,16 +2,19 @@
 
 /**
  * Liefert ein mathematisch präzises Apple-Health SVG-Icon zurück
- * @param {string} name - Name des Icons (weight, muscle, water, energy, trend, sync, fat, protein, sun, moon, radar, bar)
- * @param {number} size - Quadratische Größe in Pixeln (z.B. 14, 16, 18)
+ * @param {string} name - Name des Icons (weight, muscle, water, energy, trend, sync, fat, protein, sun, moon, radar, bar, bgGym)
+ * @param {number} size - Quadratische Größe in Pixeln (bzw. Höhe beim bgGym-Hintergrundbild)
  * @param {number} opacity - Deckkraft von 0.0 bis 1.0 (Standard 1.0 = voll sichtbar)
  * @param {number} marginRight - Abstand nach rechts in Pixeln (Standard 0)
  * @param {string} color - CSS-Farbe (Standard "currentColor")
  * @param {string} className - Optionale CSS-Klasse
  */
 export function getAppleIcon(name, size = 16, opacity = 1.0, marginRight = 0, color = 'currentColor', className = '') {
-  // 🌟 FIX: finalStyle korrekt zusammengebaut, damit alle SVGs fehlerfrei darauf zugreifen können!
-  const finalStyle = `width:${size}px; height:${size}px; stroke:${color}; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; display:inline-block; vertical-align:text-bottom; flex-shrink:0; opacity:${opacity}; margin-right:${marginRight}px;`;
+  // 🌟 Für das Hintergrundbild brauchen wir eine flexible Breite (auto), da es ein flaches Breitbild-Format (4:1) hat
+  const isBg = name === 'bgGym';
+  const widthStyle = isBg ? 'width:auto;' : `width:${size}px;`;
+
+  const finalStyle = `${widthStyle} height:${size}px; stroke:${color}; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; display:inline-block; vertical-align:text-bottom; flex-shrink:0; opacity:${opacity}; margin-right:${marginRight}px;`;
   const cls = className ? `class="${className}"` : '';
 
   const svgLibrary = {
@@ -27,7 +30,21 @@ export function getAppleIcon(name, size = 16, opacity = 1.0, marginRight = 0, co
     sun: `<svg ${cls} style="${finalStyle}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`,
     moon: `<svg ${cls} style="${finalStyle}" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>`,
     radar: `<svg ${cls} style="${finalStyle}" viewBox="0 0 24 24"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/><path d="M12 2v20M2 12h20"/></svg>`,
-    bar: `<svg ${cls} style="${finalStyle}" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6M3 20h18"/></svg>`
+    bar: `<svg ${cls} style="${finalStyle}" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6M3 20h18"/></svg>`,
+
+    // 🏋️‍♂️ (Hantel + Herzfrequenz + Herz)
+    bgGym: `<svg ${cls} style="${finalStyle}" viewBox="0 0 800 200">
+      <rect x="180" y="70" width="15" height="60" rx="3" fill="currentColor" stroke="none" />
+      <rect x="200" y="60" width="20" height="80" rx="4" fill="currentColor" stroke="none" />
+      <line x1="220" y1="100" x2="260" y2="100" stroke-width="8" />
+      <path d="M 50 100 L 260 100 L 275 100 L 285 60 L 300 150 L 315 30 L 330 120 L 340 100 L 370 100" stroke-width="5" />
+      <path d="M 370 100 C 370 80, 400 70, 410 90 C 420 70, 450 80, 450 100 C 450 120, 425 145, 410 155 C 395 145, 370 120, 370 100 Z" fill="currentColor" fill-opacity="0.15" stroke-width="5" />
+      <path d="M 450 100 L 480 100 L 490 70 L 505 140 L 520 40 L 535 120 L 545 100 L 580 100" stroke-width="5" />
+      <line x1="580" y1="100" x2="620" y2="100" stroke-width="8" />
+      <rect x="620" y="60" width="20" height="80" rx="4" fill="currentColor" stroke="none" />
+      <rect x="645" y="70" width="15" height="60" rx="3" fill="currentColor" stroke="none" />
+      <path d="M 660 100 L 750 100" stroke-width="5" />
+    </svg>`
   };
 
   return svgLibrary[name] || '';
