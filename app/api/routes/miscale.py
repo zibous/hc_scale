@@ -108,6 +108,9 @@ async def miscale(request: Request):
 
     weight = data.get("weight")
     impedance = data.get("impedance")
+    fromdevice = data.get("source", "webservice")
+
+    log.info(f"Daten von: {fromdevice}, Gewicht: {weight}, Impedanz:{impedance}.")
 
     if weight is None or impedance is None:
         return JSONResponse({"error": "missing weight or impedance"}, status_code=400)
