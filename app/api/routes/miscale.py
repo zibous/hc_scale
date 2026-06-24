@@ -102,15 +102,17 @@ def _process_measurement(user_key: str):
 @router.post("/miscale")
 async def miscale(request: Request):
     """ESP32 POST Handler."""
+
     data = await request.json()
     if not data:
         return JSONResponse({"error": "invalid JSON"}, status_code=400)
 
+    _user= data.get("name", "Unbekannt")
     weight = data.get("weight")
     impedance = data.get("impedance")
     fromdevice = data.get("source", "webservice")
 
-    log.info(f"Daten von: {fromdevice}, Gewicht: {weight}, Impedanz:{impedance}.")
+    log.info(f"Daten von: {fromdevice}, Name: {_user}, Gewicht: {weight}, Impedanz:{impedance}.")
 
     if weight is None or impedance is None:
         return JSONResponse({"error": "missing weight or impedance"}, status_code=400)
