@@ -28,7 +28,7 @@ logs/
 *.log
 
 # Data
-data/
+# data/
 !data/.gitkeep
 !data/*.json
 
