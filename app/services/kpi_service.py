@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.core.config import cfg
-from app.schemas.kpi import KpiHero, KpiIndicator, KpiResponse
+from app.schemas.kpi import KpiHero, KpiIndicator, KpiMetric, KpiResponse
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,14 @@ class KpiService:
             ],
         )
 
+        # Metriken zusammenstellen
+        metrics_list = [
+            KpiMetric(label="BMI", value=round(bmi, 1)),
+            KpiMetric(label="Fett", value=round(fat, 1), unit="%"),
+        ]
+        if other:
+            metrics_list.append(KpiMetric(label=other["user"], value=round(other["weight"], 1), unit="kg"))
+
         return KpiResponse(
             app_id=KPI_APP_ID,
             app_name=KPI_APP_NAME,
@@ -107,4 +115,5 @@ class KpiService:
             ),
             detail=detail,
             indicator=indicator,
+            metrics=metrics_list,
         )
