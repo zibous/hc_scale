@@ -13,6 +13,9 @@ class KpiIndicator(BaseModel):
     values: list[float] | None = None
     zones: list[dict[str, Any]] | None = None
     trend_pct: float | None = None
+    unit: str = ""
+    label: str = ""
+    bars: list[dict[str, Any]] | None = None  # für deltabars: [{label, value, color}]
 
 
 class KpiHero(BaseModel):

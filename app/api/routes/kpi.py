@@ -2,7 +2,7 @@
 """KPI-Endpoint für das Übersichts-Dashboard."""
 
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.schemas.kpi import KpiResponse
 from app.services.kpi_service import KpiService
@@ -12,7 +12,7 @@ router = APIRouter(tags=["kpi"])
 
 
 @router.get("/kpidata", response_model=KpiResponse, response_model_exclude_none=True)
-async def get_kpi_data():
+async def get_kpi_data(user: str | None = Query(None, description="User-Name (peter/reni) für personenbezogene KPI")):
     """Liefert KPI-Daten für das zentrale Übersichts-Dashboard."""
     service = KpiService()
-    return service.get_kpis()
+    return service.get_kpis(user=user)
