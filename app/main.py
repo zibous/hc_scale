@@ -101,9 +101,20 @@ async def lifespan(app: FastAPI):
     else:
         log.warning("MQTT nicht verfügbar – Heartbeat und HA Discovery deaktiviert")
 
+    # Webhook Publisher
+    from app.core.webhook import WebhookPublisher, notify_ha
+    from app.services.webhook_builder import build_heartbeat
+
+    webhook_publisher = WebhookPublisher(build_heartbeat=build_heartbeat)
+    webhook_publisher.start()
+    notify_ha("app_start")
+
     log.info("App initialisiert")
     yield
+
     log.info("%s shutting down", cfg.app_name)
+    webhook_publisher.stop()
+    notify_ha("app_stop")
     shutdown_mgr.initiate()
 
 
