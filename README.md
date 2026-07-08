@@ -5,55 +5,69 @@ ESP32 (ESPHome) sendet Waage-Daten per HTTP POST → FastAPI berechnet Body Metr
 
 ## Features
 
-- FastAPI REST API + Dashboard (Chart.js, Dark/Light Theme)
-- Body Metrics Berechnung (BMI, Fett, Muskeln, Wasser, Protein, Viszeralfett, Metabolisches Alter)
-- Body Score (reverse-engineered aus Mi Fit App)
-- Athleten-Korrekturfaktoren (lineare Regression)
-- SQLite Datenbank (Tagesmessungen) + CSV-History pro Monat
-- MQTT Integration (HA Discovery, Heartbeat, Retain)
-- User-Erkennung (Name oder Gewicht-Match)
-- Debounce (30s) für mehrfache Messungen
-- HA Webhook Notifications
-- KPI-Endpoint für Übersichtsdashboard
-- Zentrale Pfadauflösung (funktioniert lokal und in Docker identisch)
+- ⚖️ **Xiaomi Mi Body Composition Scale 2** – BLE via ESP32
+- 🧮 **Body Metrics** – BMI, Körperfett, Muskelmasse, Wasser, Protein, Viszeralfett, Knochenmasse
+- 🏆 **Body Score** – Reverse-engineered aus Mi Fit App (0–100 Punkte)
+- 🏋️ **Athleten-Modus** – Korrekturfaktoren via lineare Regression
+- 📊 **Dashboard** – Chart.js Verlaufskurven mit Dark/Light Theme
+- 👥 **Multi-User** – Automatische Erkennung über Name oder Gewichts-Match
+- 📡 **MQTT + HA Discovery** – Sensoren automatisch in Home Assistant
+- 🔔 **Webhooks** – Heartbeat + Messwert-Events an HA
+- 💾 **SQLite + CSV-History** – Tagesmessungen + monatliche CSV-Exporte
+- 🛡️ **Debounce** – 30s Sperre gegen Doppelmessungen
+- 📈 **KPI-Endpoint** – für zentrales Übersichts-Dashboard
+- 🐳 **Docker-ready** – Graceful Shutdown, Volume-Mounts
 
-## Architektur
+## Application Workflow
 
 ```
-                              +-----------------------+
-                              |    ESP32 (ESPHome)    |
-                              |   Xiaomi Mi Scale 2   |
-                              +-----------+-----------+
-                                          |
-                                          | HTTP POST (weight + impedance)
-                                          v
-+-------------------------------------------------------------------------------------+
-| FastAPI Application (app/main.py)                                                   |
-|                                                                                     |
-|  +------------------+    +------------------+    +----------------+                 |
-|  | POST /miscale    |--->| CalcData Service |--->| DBManager      |                 |
-|  | (Debounce 30s)   |    | (Body Metrics)   |    | (SQLite + CSV) |                 |
-|  +------------------+    +------------------+    +----------------+                 |
-|                                   |                                                 |
-|                                   v                                                 |
-|                          +------------------+                                       |
-|                          | MqttClient       |                                       |
-|                          | (Publish+Retain) |                                       |
-|                          +--------+---------+                                       |
-+---------------------------|-------|-------------------------------------------------+
-                            |       |
-              MQTT Discovery|       | JSON Data
-                            v       v
-                  +-------------------+          +---------------------+
-                  |   MQTT Broker     |          |   Web Frontend      |
-                  |   (Mosquitto)     |          |   (Dashboard)       |
-                  +--------+----------+          +---------------------+
-                           |
-                           v
-                  +-------------------+
-                  |  Home Assistant   |
-                  |  (Sensoren + HA)  |
-                  +-------------------+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        Xiaomi Mi Scale 2 (BLE)                               │
+│                        MAC: 5C:CA:D3:4C:EE:74                                │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │ BLE Advertisement (weight + impedance)
+                                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        ESP32 (ESPHome)                                        │
+│  • BLE Scan → Gewicht + Impedanz empfangen                                   │
+│  • User-Erkennung (Gewichts-Schwellwert)                                     │
+│  • HTTP POST an FastAPI                                                      │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │ POST /miscale {"name":"Peter","weight":69.5,"impedance":580}
+                                ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        FastAPI (Port 5056)                                    │
+│                                                                              │
+│  ┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐     │
+│  │ Debounce     │────>│ CalcData Service │────>│ Body Score           │     │
+│  │ (30s Sperre) │     │ • BMI            │     │ (Mi Fit reverse-eng) │     │
+│  └──────────────┘     │ • Körperfett     │     │ • 8 Teilscores       │     │
+│                        │ • Muskelmasse    │     │ • Gesamt 0-100       │     │
+│                        │ • Wasser         │     └──────────────────────┘     │
+│                        │ • Protein        │                                  │
+│                        │ • Viszeralfett   │                                  │
+│                        │ • Knochenmasse   │                                  │
+│                        │ • BMR / TDEE     │                                  │
+│                        │ • Metabol. Alter │                                  │
+│                        └────────┬─────────┘                                  │
+│                                 │                                            │
+│              ┌──────────────────┼──────────────────┐                         │
+│              │                  │                  │                         │
+│              ▼                  ▼                  ▼                         │
+│  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐                │
+│  │ SQLite DB        │  │ MQTT Broker  │  │ HA Webhook     │                │
+│  │ miscaledata.db   │  │ bodyscale/   │  │ (Event)        │                │
+│  │ + CSV History    │  │ data/{user}  │  │                │                │
+│  └──────────────────┘  └──────────────┘  └────────────────┘                │
+│              │                  │                                            │
+│              ▼                  ▼                                            │
+│  ┌──────────────────┐  ┌──────────────────────┐                            │
+│  │ Dashboard API    │  │ Home Assistant        │                            │
+│  │ /dashboard/api/  │  │ • MQTT Discovery      │                            │
+│  │ datav2, users,   │  │ • Sensoren pro User   │                            │
+│  │ export (CSV)     │  │ • Automationen        │                            │
+│  └──────────────────┘  └──────────────────────┘                            │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
