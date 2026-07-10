@@ -3,6 +3,8 @@
 Körperwaage Dashboard für Xiaomi Mi Body Composition Scale 2.
 ESP32 (ESPHome) sendet Waage-Daten per HTTP POST → FastAPI berechnet Body Metrics → SQLite + MQTT → Home Assistant.
 
+![Screenshot der Anwendung](./docs/koerperwaage.png)
+
 ## Features
 
 - ⚖️ **Xiaomi Mi Body Composition Scale 2** – BLE via ESP32
@@ -21,53 +23,53 @@ ESP32 (ESPHome) sendet Waage-Daten per HTTP POST → FastAPI berechnet Body Metr
 ## Application Workflow
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        Xiaomi Mi Scale 2 (BLE)                               │
-│                        MAC: 5C:CA:D3:4C:EE:74                                │
-└───────────────────────────────┬──────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Xiaomi Mi Scale 2 (BLE)                          │
+│                        MAC: 5C:CA:D3:4C:EE:74                           │
+└───────────────────────────────┬─────────────────────────────────────────┘
                                 │ BLE Advertisement (weight + impedance)
                                 ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        ESP32 (ESPHome)                                        │
-│  • BLE Scan → Gewicht + Impedanz empfangen                                   │
-│  • User-Erkennung (Gewichts-Schwellwert)                                     │
-│  • HTTP POST an FastAPI                                                      │
-└───────────────────────────────┬──────────────────────────────────────────────┘
-                                │ POST /miscale {"name":"Peter","weight":69.5,"impedance":580}
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        ESP32 (ESPHome)                                  │
+│  • BLE Scan → Gewicht + Impedanz empfangen                              │
+│  • User-Erkennung (Gewichts-Schwellwert)                                │
+│  • HTTP POST an FastAPI                                                 │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │ POST /miscale
                                 ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        FastAPI (Port 5056)                                    │
-│                                                                              │
-│  ┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐     │
-│  │ Debounce     │────>│ CalcData Service │────>│ Body Score           │     │
-│  │ (30s Sperre) │     │ • BMI            │     │ (Mi Fit reverse-eng) │     │
-│  └──────────────┘     │ • Körperfett     │     │ • 8 Teilscores       │     │
-│                        │ • Muskelmasse    │     │ • Gesamt 0-100       │     │
-│                        │ • Wasser         │     └──────────────────────┘     │
-│                        │ • Protein        │                                  │
-│                        │ • Viszeralfett   │                                  │
-│                        │ • Knochenmasse   │                                  │
-│                        │ • BMR / TDEE     │                                  │
-│                        │ • Metabol. Alter │                                  │
-│                        └────────┬─────────┘                                  │
-│                                 │                                            │
-│              ┌──────────────────┼──────────────────┐                         │
-│              │                  │                  │                         │
-│              ▼                  ▼                  ▼                         │
-│  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐                │
-│  │ SQLite DB        │  │ MQTT Broker  │  │ HA Webhook     │                │
-│  │ miscaledata.db   │  │ bodyscale/   │  │ (Event)        │                │
-│  │ + CSV History    │  │ data/{user}  │  │                │                │
-│  └──────────────────┘  └──────────────┘  └────────────────┘                │
-│              │                  │                                            │
-│              ▼                  ▼                                            │
-│  ┌──────────────────┐  ┌──────────────────────┐                            │
-│  │ Dashboard API    │  │ Home Assistant        │                            │
-│  │ /dashboard/api/  │  │ • MQTT Discovery      │                            │
-│  │ datav2, users,   │  │ • Sensoren pro User   │                            │
-│  │ export (CSV)     │  │ • Automationen        │                            │
-│  └──────────────────┘  └──────────────────────┘                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        FastAPI (Port 5056)                              │
+│                                                                         │
+│  ┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐ │
+│  │ Debounce     │────>│ CalcData Service │────>│ Body Score           │ │
+│  │ (30s Sperre) │     │ • BMI            │     │ (Mi Fit reverse-eng) │ │
+│  └──────────────┘     │ • Körperfett     │     │ • 8 Teilscores       │ │
+│                       │ • Muskelmasse    │     │ • Gesamt 0-100       │ │
+│                       │ • Wasser         │     └──────────────────────┘ │
+│                       │ • Protein        │                              │
+│                       │ • Viszeralfett   │                              │
+│                       │ • Knochenmasse   │                              │
+│                       │ • BMR / TDEE     │                              │
+│                       │ • Metabol. Alter │                              │
+│                       └────────┬─────────┘                              │
+│                                │                                        │
+│              ┌─────────────────┼──────────────────┐                     │
+│              │                 │                  │                     │
+│              ▼                 ▼                  ▼                     │
+│  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐             │
+│  │ SQLite DB        │  │ MQTT Broker  │  │ HA Webhook     │             │
+│  │ miscaledata.db   │  │ bodyscale/   │  │ (Event)        │             │
+│  │ + CSV History    │  │ data/{user}  │  │                │             │
+│  └──────────────────┘  └──────────────┘  └────────────────┘             │
+│              │                  │                                       │
+│              ▼                  ▼                                       │
+│  ┌──────────────────┐  ┌──────────────────────┐                         │
+│  │ Dashboard API    │  │ Home Assistant       │                         │
+│  │ /dashboard/api/  │  │ • MQTT Discovery     │                         │
+│  │ datav2, users,   │  │ • Sensoren pro User  │                         │
+│  │ export (CSV)     │  │ • Automationen       │                         │
+│  └──────────────────┘  └──────────────────────┘                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -117,6 +119,56 @@ Antwort bei Erfolg:
 ```json
 {"status": "ok", "user": "Peter", "weight": 69.5}
 ```
+
+## Warum die BIA-Messung bei Sportlern
+
+Die bioelektrische Impedanzanalyse (BIA) basiert standardmäßig auf mathematischen Formeln,
+die für den durchschnittlichen, eher untrainierten Körper entwickelt wurden.
+
+Bei Sportlern führt das zu systematischen Messfehlern:
+
+* **Der Muskel-Irrtum:** Das Muskelgewebe von Athleten hat eine höhere Dichte, einen veränderten Wasseranteil (Hydratation) und eine stärkere Durchblutung als bei Untrainierten.
+* **Die Fehlmessung:** Die Standard-Formel interpretiert den veränderten elektrischen Widerstand (Impedanz) des sportlichen Muskels falsch und ordnet ihn fälschlicherweise als Fettgewebe ein.
+* **Das Ergebnis:** Ohne Korrektur zeigt die Waage bei Athleten systematisch einen **zu hohen Fettanteil** und eine **zu geringe Muskelmasse** an.
+
+## Was bewirkt der „Athletic-Modus“ (`athletic: true`)?
+
+Sobald dieser Modus aktiviert ist, schaltet die Software auf spezielle Schätzformeln um,
+die über **lineare Regressionsfaktoren** an echten Sportlern validiert wurden:
+
+* Die Faktoren passen die Berechnung an das spezifische Verhältnis von Gesamtkörperwasser und Muskelzellmasse trainierter Menschen aus.
+* Der Algorithmus korrigiert den Rechenfehler, senkt den angezeigten Fettanteil und hebt die Muskelmasse auf ein realistisches Niveau an.
+
+Im Code lässt sich diese Anpassung über dynamische, lineare Korrekturfaktoren lösen. Das folgende Python-Snippet zeigt, wie die Rohdaten der Waage basierend auf dem Körpergewicht des Nutzers angepasst werden, sobald `athletic: true` aktiv ist:
+
+```python
+def _apply_adjustments(self):
+    # Wenn der Athletic-Modus deaktiviert ist, wird nichts verändert
+    if not self.user.athletic:
+        return
+
+    w = self.weight
+    d = self.data
+
+    # Lineare Regressionsfaktoren basierend auf dem Gewicht
+    factors = {
+        "fat": 0.018411 * w + (-0.6888),
+        "water": 0.000908 * w + 0.9799,
+        "bone": -0.001150 * w + 1.3863,
+        "muscle": -0.016164 * w + 2.1373,
+    }
+
+    # Werte korrigieren und auf zwei Nachkommastellen runden
+    for field, factor in factors.items():
+        if field in d:
+            d[field] = round(d[field] * factor, 2)
+```
+
+### Wie die Formel arbeitet:
+* **Fettanteil (`fat`)**: Der Faktor korrigiert die systematische Überschätzung der Waage bei trainierten Menschen nach unten.
+* **Muskelmasse (`muscle`)**: Der Basis-Faktor startet hoch und fängt die messtechnische Unterschätzung bei geringem Körperfettanteil effektiv auf.
+* **Wasseranteil (`water`)**: Da Muskelgewebe stark hydriert ist, wird der Wasserwert minimal angehoben.
+
 
 ## Projektstruktur
 
