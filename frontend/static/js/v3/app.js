@@ -1,10 +1,10 @@
 // frontend/static/js/v3/app.js
-import { showMessage } from './messageBox.js';
-import { renderAllCharts, syncChartTheme, injectChartTitles } from './charts.js';
-import { renderProfile } from './renderProfile.js';
-import { renderKPITiles as renderGroupedTiles, renderKPITilesSkeleton } from './tiles2.js';
+import { injectChartTitles, renderAllCharts, syncChartTheme } from './charts.js';
 import { initDateSelector } from './dateselector.js';
 import { getAppleIcon } from './icons.js';
+import { showMessage } from './messageBox.js';
+import { renderProfile } from './renderProfile.js';
+import { renderKPITiles as renderGroupedTiles, renderKPITilesSkeleton } from './tiles2.js';
 
 const renderTiles = renderGroupedTiles;
 
@@ -49,7 +49,24 @@ window.addEventListener('resize', () => {
 });
 
 /**
+ * Aktualisiert die Header-Stats-Zeile unter dem SVG-Logo
+ */
+function updateHeaderStats(userData) {
+  const el = document.getElementById('headerStats');
+  if (!el) return;
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = now.toTimeString().slice(0, 8);
+  const count = userData?.count || 0;
+  const since = userData?.first || '–';
+
+  el.textContent = `${dateStr} ${timeStr}  ${count} Messungen  |  seit ${since}`;
+}
+
+/**
  * Injiziert die Hantel-Puls Grafik nahtlos in den Header
+ * und zeigt darunter Datum, Uhrzeit, Messungen und "seit"-Info
  */
 function initHeaderBackground() {
   const header = $('.header');
@@ -58,10 +75,10 @@ function initHeaderBackground() {
   const wrapper = document.createElement('div');
   wrapper.className = 'header-bg-wrapper';
 
-  // Ruft das neue Icon aus deiner icons.js ab:
-  // Parameter: (name="bgGym", size=75, opacity=0.15)
-  // export function getAppleIcon(name, size = 16, opacity = 1.0, marginRight = 0, color = 'currentColor', className = '') {
-  wrapper.innerHTML = getAppleIcon('bgGym', 85, 0.45, 0,'#ff3b30');
+  wrapper.innerHTML = `
+    ${getAppleIcon('bgGym', 85, 0.45, 0, '#ff3b30')}
+    <div class="header-stats" id="headerStats"></div>
+  `;
 
   // Fügt das Element als letztes Kind in den Header ein
   header.appendChild(wrapper);
@@ -120,6 +137,9 @@ function updateDashboardUI(payload, username) {
 
   const currentUserData = state.usersCache.find(u => u.name.toLowerCase() === username.toLowerCase());
   state.lastKnownCount = currentUserData ? currentUserData.count : payload.count || 0;
+
+  // Header-Stats aktualisieren
+  updateHeaderStats(currentUserData);
 
   const profileRenderer = typeof renderProfile === 'function' ? renderProfile : (window.renderProfile || renderProfile.renderProfile);
 

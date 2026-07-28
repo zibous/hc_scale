@@ -83,10 +83,10 @@ class DashboardService:
         """Dropdown-Liste aller User mit Anzahl Messungen."""
         conn = self._connect()
         rows = conn.execute(
-            "SELECT name, COUNT(*) as count FROM daily_miscale GROUP BY name"
+            "SELECT name, COUNT(*) as count, MIN(date) as first FROM daily_miscale GROUP BY name"
         ).fetchall()
         conn.close()
-        return [{"name": r["name"], "count": r["count"]} for r in rows]
+        return [{"name": r["name"], "count": r["count"], "first": r["first"]} for r in rows]
 
     def load_dashboard_data(self, user: str, date_from: str, date_to: str) -> tuple[list[dict], list[dict], dict]:
         """Kompletter Datenladevorgang: Timeline + Previous + JSON-Patch + Deduplizierung."""

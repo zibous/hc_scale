@@ -9,7 +9,7 @@ FORGEJO_URL  = http://$(FORGEJO_IP):$(FORGEJO_PORT)/$(FORGEJO_USER)/$(PROJECT_NA
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
-.PHONY: build up down restart rebuild logs ps run dev install clean backup help jsbuild jsclean
+.PHONY: build up down restart rebuild logs ps run dev install clean backup help jsbuild jsclean import import-dry
 VERSION := $(shell git describe --tags --always)
 
 # ---------------------------------------------------------
@@ -188,6 +188,15 @@ git-release: git-status ## Neues Versions-Tag automatisch berechnen, erstellen u
 	git tag -a $$NEXT_TAG -m "Automatisches Release $$NEXT_TAG am $$(date +'%Y-%m-%d %H:%M') via Makefile"; \
 	git push origin $$NEXT_TAG; \
 	echo "🎉 Version $$NEXT_TAG erfolgreich an Forgejo übermittelt!"
+
+# ---------------------------------------------------------
+# Import
+# ---------------------------------------------------------
+import: ## CSV-Import aus data/import/ (Upsert + nach done/ verschieben)
+	@$(PYTHON) scripts/import_csv.py
+
+import-dry: ## CSV-Import simulieren (nur anzeigen, nichts schreiben)
+	@$(PYTHON) scripts/import_csv.py --dry-run
 
 # ---------------------------------------------------------
 # Test API
