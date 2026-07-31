@@ -30,13 +30,10 @@ Die **Xiaomi Mi Body Composition Scale 2** ist eine der meistverkauften Smart-Wa
 Die Mi Scale 2 sendet bei jeder Messung ein BLE Advertisement mit Gewicht und Impedanz-Rohdaten.
 Ein ESP32 mit ESPHome empfängt dieses Signal, erkennt den User und sendet die **Werte per HTTP POST** an die hc_scale-Anwendung:
 
-```text
-┌─────────────┐     BLE      ┌──────────────┐     HTTP POST    ┌──────────────┐
-│  Mi Scale 2 │ ──────────── │  ESP32       │ ──────────────── │  FastAPI     │
-│  (Bathroom) │  weight +    │  (ESPHome)   │  /miscale        │  (hc_scale)  │
-│             │  impedance   │              │  {weight, imp}   │              │
-└─────────────┘              └──────────────┘                  └──────────────┘
-```
+{{< mermaid >}}
+flowchart LR
+    Scale["Mi Scale 2<br>(Bathroom)"] -->|"BLE<br>weight + impedance"| ESP["ESP32<br>(ESPHome)"] -->|"HTTP POST<br>/miscale"| API["FastAPI<br>(hc_scale)"]
+{{< /mermaid >}}
 
 Der ESP32 steht im selben Raum wie die Waage (Reichweite: ~5m) und ist über WLAN mit dem Netzwerk verbunden.
 Neben dem Datentransfer mit HTTP POST ist der ESP32 über API mit Homeassistant verbunden und
@@ -66,36 +63,17 @@ Das Makefile führt im Hintergrund automatisch das passende `  :❯ docker build
 
 ## 🏗️ Architektur & Datenfluss
 
-```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        Xiaomi Mi Scale 2 (BLE)                               │
-└───────────────────────────────┬──────────────────────────────────────────────┘
-                                │ BLE Advertisement
-                                ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        ESP32 (ESPHome)                                       │
-│  • BLE Scan → Gewicht + Impedanz                                             │
-│  • User-Erkennung (Gewichts-Schwellwert)                                     │
-│  • HTTP POST an FastAPI                                                      │
-└───────────────────────────────┬──────────────────────────────────────────────┘
-                                │ POST /miscale
-                                ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  FastAPI (Port 5056)                                                         │
-│                                                                              │
-│  ┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐      │
-│  │ Debounce     │────>│ CalcData Service │────>│ Body Score           │      │
-│  │ (30s Sperre) │     │ (Body Metrics)   │     │ (Mi Fit Algorithm)   │      │
-│  └──────────────┘     └────────┬─────────┘     └──────────────────────┘      │
-│                                │                                             │
-│              ┌─────────────────┼─────────────────┐                           │
-│              ▼                 ▼                 ▼                           │
-│  ┌──────────────────┐  ┌──────────────┐  ┌────────────────┐                  │
-│  │ SQLite DB        │  │ MQTT Broker  │  │ HA Webhook     │                  │
-│  │ + CSV History    │  │ bodyscale/   │  │                │                  │
-│  └──────────────────┘  └──────────────┘  └────────────────┘                  │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+{{< mermaid >}}
+flowchart TD
+    Scale["Xiaomi Mi Scale 2 (BLE)"] -->|"BLE Advertisement"| ESP["ESP32 (ESPHome)<br>BLE Scan · User-Erkennung"]
+    ESP -->|"POST /miscale"| FastAPI["FastAPI :5056"]
+    FastAPI --> Debounce["Debounce (30s)"]
+    Debounce --> Calc["CalcData Service<br>(Body Metrics)"]
+    Calc --> Score["Body Score<br>(Mi Fit Algorithm)"]
+    Calc --> DB["SQLite DB + CSV History"]
+    Calc --> MQTT["MQTT Broker<br>bodyscale/"]
+    Calc --> HA["HA Webhook"]
+{{< /mermaid >}}
 
 ---
 
