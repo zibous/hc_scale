@@ -239,7 +239,10 @@ class DashboardService:
 
             if "timestamp" in json_data and json_data["timestamp"]:
                 ts_str = str(json_data["timestamp"])
-                item["timestamp"] = ts_str
-                item["date"] = ts_str[:10]
+                json_date = ts_str[:10]
+                # Timestamp nur überschreiben wenn gleicher Tag (sonst
+                # verschiebt sich der Eintrag in einen anderen Zeitraum)
+                if json_date == item.get("date", ""):
+                    item["timestamp"] = ts_str
 
         return item

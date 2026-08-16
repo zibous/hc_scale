@@ -117,6 +117,7 @@ class DBManager:
             return False
 
     def _write_csv_backup(self, user_id: int, name: str, timestamp: str, date_str: str, data: dict):
+        """CSV-Backup: Pro Datum nur ein Eintrag (der letzte gewinnt)."""
         try:
             if not name or len(date_str) < 7:
                 return
@@ -124,7 +125,6 @@ class DBManager:
             history_dir = os.path.join(self._data_dir, "history", name.lower())
             os.makedirs(history_dir, exist_ok=True)
             csv_path = os.path.join(history_dir, f"{month}.csv")
-            is_new = not os.path.isfile(csv_path)
 
             row_dict = {
                 "id": user_id,
@@ -143,11 +143,23 @@ class DBManager:
                 "poi": data.get("poi"),
             }
 
-            with open(csv_path, "a", newline="", encoding="utf-8") as f:
+            # Bestehende Einträge laden, nach Datum deduplizieren
+            existing: dict[str, dict] = {}
+            if os.path.isfile(csv_path):
+                with open(csv_path, "r", newline="", encoding="utf-8") as f:
+                    reader = csv.DictReader(f, delimiter=";")
+                    for row in reader:
+                        existing[row.get("date", "")] = row
+
+            # Aktuellen Eintrag einfügen/überschreiben (letzter gewinnt)
+            existing[date_str] = {k: str(v) if v is not None else "" for k, v in row_dict.items()}
+
+            # Sortiert nach Datum zurückschreiben
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, delimiter=";")
-                if is_new:
-                    writer.writeheader()
-                writer.writerow(row_dict)
+                writer.writeheader()
+                for date_key in sorted(existing.keys()):
+                    writer.writerow(existing[date_key])
         except Exception:
             log.exception("CSV-Backup fehlgeschlagen")
 

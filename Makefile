@@ -202,7 +202,7 @@ import-dry: ## CSV-Import simulieren (nur anzeigen, nichts schreiben)
 # Test API
 # ---------------------------------------------------------
 HOST := localhost
-PORT := 4056
+PORT := 5000
 
 test-post: ## POST Testmessung (Reni) an /miscale
 	@curl -s -X POST http://$(HOST):$(PORT)/miscale \
@@ -212,7 +212,7 @@ test-post: ## POST Testmessung (Reni) an /miscale
 test-post-peter: ## POST Testmessung (Peter) an /miscale
 	@curl -s -X POST http://$(HOST):$(PORT)/miscale \
 		-H "Content-Type: application/json" \
-		-d '{"name": "Peter", "weight": 70.5, "impedance": 560, "timestamp": "'$$(date +%Y-%m-%dT%H:%M:%S)'"}' | python3 -m json.tool
+		-d '{"name": "Peter", "weight": 72.2, "impedance": 526, "timestamp": "'$$(date +%Y-%m-%dT%H:%M:%S)'"}' | python3 -m json.tool
 
 test-health: ## GET Health-Check
 	@curl -s http://$(HOST):$(PORT)/api/health | python3 -m json.tool
