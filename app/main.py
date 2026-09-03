@@ -3,7 +3,14 @@
 home-miscale – FastAPI Application
 ====================================
 ESP32 (ESPHome) → HTTP POST → FastAPI → Berechnung → SQLite + MQTT → Home Assistant
+
+Copyright © 2026 Peter. All rights reserved.
+
+THIS SOFTWARE IS PROPRIETARY AND CONFIDENTIAL.
+No part of this software may be reproduced, distributed, or transmitted
+in any form or by any means without prior written permission.
 """
+
 
 import atexit
 import logging
