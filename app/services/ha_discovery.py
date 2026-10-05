@@ -57,8 +57,13 @@ def publish_discovery(mqtt_client: MqttClient, user_name: str):
         topic_type = sensor.get("topic", "data")
         state_topic = f"{cfg.mqtt.topic}/{user_name}/{topic_type}"
 
-        uid = f"{prefix}_{user_name.lower()}_{key}"
+        # uid = f"{prefix}{user_name.lower()}_{key}"
+        uid = f"{prefix}/{user_name.lower()}_{key}"
+
+        ## homeassistant/sensor/miscale/peter_weight/config
         discovery_topic = f"{ha_base}/sensor/{uid}/config"
+        
+        ## log.info("ha_discovery Topic: %s", discovery_topic)
 
         payload = {
             "name": f"{user_name} {sensor['name']}",
